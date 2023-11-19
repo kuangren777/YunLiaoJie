@@ -59,7 +59,15 @@ class GUI(QtWidgets.QWidget):
 
         self.setLayout(layout)
 
-    def display_message(self, message):
+    def display_message(self, sender_id, message):
+        # 检查消息发送者是否是当前选择的好友
+        if sender_id != self.current_friend:
+            # 使用加粗字体显示消息
+            message = f"<b>{message}</b>"
+
+        self.messages_area.append(message)
+
+    def display_message_normal(self, message):
         self.messages_area.append(message)
 
     def on_send_button_click(self):
@@ -77,7 +85,7 @@ class GUI(QtWidgets.QWidget):
             current_datetime = datetime.now()
             formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
-            self.display_message(f"{formatted_datetime} 你: {message}")
+            self.display_message_normal(f"{formatted_datetime} 你: {message}")
             self.message_entry.clear()
 
     def on_friend_clicked(self, index):
