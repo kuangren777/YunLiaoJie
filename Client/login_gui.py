@@ -11,13 +11,17 @@ from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QDialog
 from PyQt5.QtGui import QFont  # 导入字体类
 from Client.gui import GUI
+import threading
 
 
 class LoginWindow(QDialog):
+    open_register_signal = QtCore.pyqtSignal()  # 创建一个新信号
+
     def __init__(self, auth):
         super().__init__()
         self.auth = auth
         self.user_info = None
+        self.clicked_register = False  # 添加一个标志
         self.init_ui()
 
     def init_ui(self):
@@ -64,18 +68,17 @@ class LoginWindow(QDialog):
             self.reject()  # 关闭窗口，并返回 QDialog.Rejected
 
     def on_register_clicked(self):
-        self.hide()
-        self.register_window = RegisterWindow(self.auth)
-        self.register_window.show()
+        self.hide()  # 隐藏登录窗口
+        self.open_register_window()
 
-    # def open_main_window(self, user_info):
-    #     self.hide()
-    #     # 假设您的主界面 GUI 类需要用户信息作为参数
-    #     self.main_window = GUI(user_info)  # 创建主界面窗口实例
-    #     self.main_window.run()
+    def open_register_window(self):
+        register_window = RegisterWindow(self.auth)
+        register_window.exec_()  # 使用 exec_ 以模态方式运行
+        self.show()  # 重新显示登录窗口
 
 
-class RegisterWindow(QWidget):
+
+class RegisterWindow(QDialog):
     def __init__(self, auth):
         super().__init__()
         self.auth = auth
@@ -123,16 +126,17 @@ class RegisterWindow(QWidget):
         email = self.email_input.text()
         if self.auth.register_user(username, password, email):
             QMessageBox.information(self, "注册成功", "注册成功！")
-            self.hide()
-            self.login_window = LoginWindow(self.auth)
-            self.login_window.show()
+            self.close()  # 关闭注册窗口
         else:
             QMessageBox.warning(self, "注册失败", "注册失败，请重试！")
 
     def on_login_clicked(self):
-        self.hide()
-        self.login_window = LoginWindow(self.auth)
+        self.close()  # 关闭注册窗口
+
+    def on_login_clicked(self):
+        self.login_window = LoginWindow(self.auth)  # 创建登录窗口的新实例
         self.login_window.show()
+        self.close()  # 关闭注册窗口
 
 
 if __name__ == "__main__":

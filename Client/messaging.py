@@ -26,6 +26,7 @@ class Client:
         self.app = QtWidgets.QApplication(sys.argv)  # 创建 QApplication 实例
         self.login_info = user_info
         self.user_id = user_info[0]
+        self.username = user_info[1]
         self.database = Database()
 
         self.all_friends = self.get_friend_list()
@@ -78,6 +79,8 @@ class Client:
 
                 # 显示消息
                 self.gui.display_message(int(sender_id), formatted_message)
+
+                self.gui.update_friend_list_with_latest_message(sender_id, content, False)
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break

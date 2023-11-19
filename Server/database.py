@@ -169,6 +169,31 @@ class Database:
         """, (user_id, friend_id, friend_id, user_id))
         return self.cursor.fetchall()
 
+    def get_latest_message(self, user_id, friend_id):
+        """
+        获取两个用户之间的最新聊天记录。
+        """
+        self.cursor.execute("""
+            SELECT content FROM chat_messages
+            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            ORDER BY timestamp DESC LIMIT 1
+        """, (user_id, friend_id, friend_id, user_id))
+        result = self.cursor.fetchone()
+        return result[0] if result else ""
+
+    # 在 Database 类中
+    def get_latest_message_with_sender(self, user_id, friend_id):
+        """
+        获取两个用户之间的最新聊天记录及发送者。
+        """
+        self.cursor.execute("""
+            SELECT content, sender_id FROM chat_messages
+            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            ORDER BY timestamp DESC LIMIT 1
+        """, (user_id, friend_id, friend_id, user_id))
+        result = self.cursor.fetchone()
+        return result if result else ("", None)
+
 
 # if __name__ == "__main__":
 #     db = Database()
