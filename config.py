@@ -13,7 +13,7 @@ DATABASE_PATH = 'db/chat_database.sqlite'
 
 # 安全配置
 # 这里可以放置一些有关安全性的配置，比如加密密钥、认证相关的配置等
-ENCRYPTION_KEY = 'luo'
+ENCRYPTION_KEY = 'btCaZFe_QWV6bvfJQ2AMUlvFsPqlfkeknH4vc7QKVgY='
 
 # 其他全局配置
 # 根据项目需求，可以在这里添加其他的全局配置

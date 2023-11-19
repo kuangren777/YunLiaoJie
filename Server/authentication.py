@@ -4,7 +4,7 @@
 # @File    : authentication.py
 # @Tags    :
 import hashlib
-from server.database import Database
+from Server.database import Database
 
 
 class Authentication:
@@ -24,15 +24,12 @@ class Authentication:
             return False
 
     def login_user(self, username, password):
-        """
-        用户登录。
-        """
         user_info = self.database.get_user_info(username)
         if user_info:
-            stored_password_hash = user_info[2]  # 假设密码哈希存储在第三个字段
+            stored_password_hash = user_info[2]  # 假设这是从数据库获取的信息
             if self.verify_password(password, stored_password_hash):
-                return True
-        return False
+                return user_info  # 返回用户信息
+        return None
 
     def hash_password(self, password):
         """

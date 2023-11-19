@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2023/11/19 10:23
 # @Author  : KuangRen777
-# @File    : server.py
+# @File    : Server.py
 # @Tags    :
 import socket
 import threading
-from server.database import Database
+from Server.database import Database
 from utils.encryption import Encryption  # 修改导入语句
+from config import ENCRYPTION_KEY
 
 
 class Server:
@@ -18,7 +19,8 @@ class Server:
         self.clients = {}  # 用于保存连接的客户端
 
         self.database = Database()  # 假设有一个数据库类处理数据库操作
-        self.encryption = Encryption()  # 创建加密实例
+        self.encryption = Encryption(key=ENCRYPTION_KEY)  # 创建加密实例
+        self.current_online = {}
 
     def start(self):
         self.socket.listen(5)
@@ -27,6 +29,8 @@ class Server:
         while True:
             client_socket, address = self.socket.accept()
             print(f"Connection from {address}")
+            self.current_online['1'] = {address}
+            print(f'current online:{self.current_online}')
 
             # 创建并启动新线程来处理客户端
             threading.Thread(target=self.handle_client, args=(client_socket, address)).start()
@@ -37,14 +41,16 @@ class Server:
                 encrypted_message = client_socket.recv(1024)
                 if not encrypted_message:
                     break
-                message = self.encryption.decrypt(encrypted_message)
-                print(message)
+                message = self.encryption.decrypt(encrypted_message).decode('utf-8')
+                print(f"Received message from {address}: {message}")
+
                 # 处理解密后的消息
+                # TODO: 处理解密后的消息
 
             except socket.error:
-                print(11)
                 break
 
+        print(123)
         client_socket.close()
         self.remove_client(address)
 

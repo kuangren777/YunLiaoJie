@@ -3,10 +3,10 @@
 # @Author  : KuangRen777
 # @File    : chat.py
 # @Tags    :
-from client.messaging import Chat  # 导入 Chat 类
-from client.messaging import Client  # 导入 Client 类
+from Client.messaging import Chat  # 导入 Chat 类
+from Client.messaging import Client  # 导入 Client 类
 
-# 测试代码，实际使用时应在 client.py 中初始化和管理 ChatSession 实例
+# 测试代码，实际使用时应在 Client.py 中初始化和管理 ChatSession 实例
 if __name__ == "__main__":
     client = Client("127.0.0.1", 8000)  # 创建一个Client实例
     chat_session = Chat(client)  # 将Client实例传递给Chat

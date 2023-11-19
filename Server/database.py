@@ -72,7 +72,7 @@ class Database:
         """
         查询用户信息。
         """
-        self.cursor.execute("SELECT user_id, username, email, last_login FROM users WHERE username = ?", (username,))
+        self.cursor.execute("SELECT user_id, username, password_hash, email, last_login FROM users WHERE username = ?", (username,))
         return self.cursor.fetchone()
 
     def update_user_status(self, user_id, status):

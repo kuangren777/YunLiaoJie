@@ -7,10 +7,10 @@ from cryptography.fernet import Fernet
 from cryptography.fernet import InvalidToken
 
 
-
 class Encryption:
     def __init__(self, key=None):
         self.key = key or Fernet.generate_key()
+        # print(self.key)
         self.cipher_suite = Fernet(self.key)
 
     def encrypt(self, data):

@@ -5,8 +5,12 @@
 # @Tags    :
 import socket
 import threading
+from utils.encryption import Encryption  # 修改导入语句
+from config import ENCRYPTION_KEY
+import sys
+from PyQt5 import QtWidgets, QtCore
 
-from client.gui import GUI
+from Client.gui import GUI
 
 
 class Client:
@@ -14,14 +18,17 @@ class Client:
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.gui = GUI(self)  # 假设您有一个图形界面类 GUI
-        self.chat = Chat(self)  # 创建一个Chat实例并关联到Client
-        self.connected = False  # 添加一个连接状态标志
+        self.encryption = Encryption(key=ENCRYPTION_KEY)
+        self.connected = False
+
+        self.app = QtWidgets.QApplication(sys.argv)  # 创建 QApplication 实例
+        self.gui = GUI(self)  # 创建 GUI 实例
+        self.chat = Chat(self)  # 创建 Chat 实例
 
     def connect_to_server(self):
         try:
             self.socket.connect((self.host, self.port))
-            print("Connected to server.")
+            print("Connected to Server.")
             self.connected = True  # 设置连接状态为 True
             return True
         except Exception as e:
@@ -31,14 +38,17 @@ class Client:
     def send_message(self, message):
         if self.connected:  # 只有在连接成功后才发送消息
             try:
-                self.socket.sendall(message.encode())
+                encrypted_message = self.encryption.encrypt(message)
+                self.socket.sendall(encrypted_message)
             except Exception as e:
                 print(f"Failed to send message: {e}")
 
     def receive_messages(self):
         while True:
             try:
-                message = self.socket.recv(1024).decode()
+                encrypted_message = self.socket.recv(1024)
+                print('receive the message')
+                message = self.encryption.decrypt(encrypted_message)
                 self.gui.display_message(message)
             except Exception as e:
                 print(f"Error receiving message: {e}")
@@ -48,6 +58,7 @@ class Client:
         if self.connect_to_server():
             threading.Thread(target=self.receive_messages, daemon=True).start()
             self.gui.run()
+            sys.exit(self.app.exec_())  # 启动事件循环
 
     def on_send_button_click(self, message):
         self.send_message(message)
@@ -99,3 +110,8 @@ class Chat:
         """
         self.current_chat_id = chat_id
         # 这里可以根据 chat_id 实现切换聊天对象的逻辑
+
+
+if __name__ == "__main__":
+    client = Client("127.0.0.1", 8000)
+    client.start()
