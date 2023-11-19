@@ -10,6 +10,7 @@ from config import ENCRYPTION_KEY
 import sys
 from PyQt5 import QtWidgets, QtCore
 from Server.database import Database
+from datetime import datetime
 
 from Client.gui import GUI
 
@@ -27,6 +28,13 @@ class Client:
         self.user_id = user_info[0]
         self.database = Database()
 
+        self.all_friends = self.get_friend_list()
+        self.all_friends_id_to_name = {}
+        self.all_friends_name_to_id = {}
+        for friend in self.all_friends:
+            self.all_friends_id_to_name[friend[0]] = friend[1]
+            self.all_friends_name_to_id[friend[1]] = friend[0]
+
         self.gui = GUI(self)  # 创建 GUI 实例
         self.chat = Chat(self)  # 创建 Chat 实例
 
@@ -35,26 +43,38 @@ class Client:
             self.socket.connect((self.host, self.port))
             print("Connected to Server.")
             self.connected = True  # 设置连接状态为 True
+            self.socket.sendall(self.encryption.encrypt(f'#@#{self.user_id}'))
             return True
         except Exception as e:
             print(f"Connection failed: {e}")
             return False
 
-    def send_message(self, message):
+    def send_message(self, current_friend, message):
         if self.connected:  # 只有在连接成功后才发送消息
             try:
+                message = f'{current_friend}#$#{message}'
                 encrypted_message = self.encryption.encrypt(message)
                 self.socket.sendall(encrypted_message)
             except Exception as e:
                 print(f"Failed to send message: {e}")
+
+    def get_friend_name(self, friend_id):
+        for friend in self.all_friends:
+            if friend[0] == friend_id:
+                return friend[1]
+        return None
 
     def receive_messages(self):
         while True:
             try:
                 encrypted_message = self.socket.recv(1024)
                 print('receive the message')
-                message = self.encryption.decrypt(encrypted_message)
-                self.gui.display_message(message)
+                message = self.encryption.decrypt(encrypted_message).decode('utf-8')
+
+                current_datetime = datetime.now()
+                formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+                self.gui.display_message(f'{formatted_datetime} {self.get_friend_name(self.gui.current_friend)}:{message}')
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break
@@ -70,6 +90,9 @@ class Client:
 
     def get_friend_list(self):
         return self.database.get_friends_user_info(self.user_id)
+
+    def add_message_into_database(self, sender_id, receiver_id, content):
+        self.database.add_chat_message(sender_id, receiver_id, content)
 
 
 class Chat:

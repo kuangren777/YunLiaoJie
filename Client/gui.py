@@ -4,6 +4,7 @@
 # @File    : gui.py
 # @Tags    :
 from PyQt5 import QtWidgets, QtGui, QtCore
+from datetime import datetime
 
 
 class GUI(QtWidgets.QWidget):
@@ -11,6 +12,7 @@ class GUI(QtWidgets.QWidget):
         super().__init__()
         self.client = client
         self.current_friend = None
+
         self.init_ui()
 
     def init_ui(self):
@@ -23,8 +25,7 @@ class GUI(QtWidgets.QWidget):
         # 好友列表
         self.friends_list = QtWidgets.QListWidget()
         print(self.client.user_id)
-        current_friends = self.client.get_friend_list()
-        for friend in current_friends:
+        for friend in self.client.all_friends:
             self.friends_list.addItem(friend[1])
 
         self.friends_list.clicked.connect(self.on_friend_clicked)
@@ -62,17 +63,41 @@ class GUI(QtWidgets.QWidget):
         self.messages_area.append(message)
 
     def on_send_button_click(self):
+        # 如果没有选择好友，不执行发送操作
+        if self.current_friend is None:
+            # 显示提示消息，这里可以根据实际情况调整
+            QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友")
+            return
+
         message = self.message_entry.text()
-        self.client.send_message(message)
-        self.display_message(f"你: {message}")
-        self.message_entry.clear()
+        # 确保消息非空
+        if message:
+            self.client.send_message(self.current_friend, message)
+
+            current_datetime = datetime.now()
+            formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            self.display_message(f"{formatted_datetime} 你: {message}")
+            self.message_entry.clear()
 
     def on_friend_clicked(self, index):
         friend_name = self.friends_list.currentItem().text()
-        self.current_friend = friend_name  # 更新当前聊天的好友名
+        friend_id = self.get_friend_id(friend_name)  # 假设这个方法能够根据好友名获取其 user_id
+        self.current_friend = friend_id  # 更新当前聊天的好友ID
         self.current_friend_label.setText(f"正在与 {friend_name} 聊天")  # 更新标签
         self.messages_area.clear()  # 清空聊天记录
-        # TODO: 加载与该好友的聊天记录
+
+        # 加载与该好友的聊天记录
+        chat_messages = self.client.database.get_chat_messages(self.client.user_id, friend_id)
+        for content, sender_id, timestamp in chat_messages:
+            sender_name = "你" if sender_id == self.client.user_id else friend_name
+            self.messages_area.append(f"{timestamp} {sender_name}: {content}")
+
+    def get_friend_id(self, friend_name):
+        for friend in self.client.all_friends:
+            if friend[1] == friend_name:
+                return friend[0]
+        return None
 
     def run(self):
         self.show()

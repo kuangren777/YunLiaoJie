@@ -148,11 +148,40 @@ class Database:
 
         return friends_info
 
+    def add_chat_message(self, sender_id, receiver_id, content):
+        """
+        向 chat_messages 表中添加一条消息记录。
+        """
+        self.cursor.execute(
+            "INSERT INTO chat_messages (sender_id, receiver_id, message_type, content, timestamp) VALUES (?, ?, ?, ?, datetime('now'))",
+            (sender_id, receiver_id, 'text', content)  # 假设消息类型为 'text'
+        )
+        self.conn.commit()
+
+    def get_chat_messages(self, user_id, friend_id):
+        """
+        获取两个用户之间的聊天记录。
+        """
+        self.cursor.execute("""
+            SELECT content, sender_id, timestamp FROM chat_messages
+            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            ORDER BY timestamp ASC
+        """, (user_id, friend_id, friend_id, user_id))
+        return self.cursor.fetchall()
+
+
+# if __name__ == "__main__":
+#     db = Database()
+#     # db.create_tables()
+#     # 测试数据库功能
+#     user_id = 1  # 假设的 user_id
+#     friends_ids = db.get_friends_user_info(user_id)
+#     print(f"User {user_id}'s friends: {friends_ids}")
 
 if __name__ == "__main__":
     db = Database()
-    # db.create_tables()
-    # 测试数据库功能
-    user_id = 1  # 假设的 user_id
-    friends_ids = db.get_friends_user_info(user_id)
-    print(f"User {user_id}'s friends: {friends_ids}")
+    db.create_tables()
+
+    # 添加一条聊天消息示例
+    db.add_chat_message(1, 2, 'Hello, this is a message content')
+    print("Message added to the database.")
