@@ -72,7 +72,8 @@ class Database:
         """
         查询用户信息。
         """
-        self.cursor.execute("SELECT user_id, username, password_hash, email, last_login FROM users WHERE username = ?", (username,))
+        self.cursor.execute("SELECT user_id, username, password_hash, email, last_login FROM users WHERE username = ?",
+                            (username,))
         return self.cursor.fetchone()
 
     def update_user_status(self, user_id, status):
@@ -112,8 +113,46 @@ class Database:
         """
         self.conn.close()
 
+    def get_friends(self, user_id):
+        """
+        获取指定用户的所有好友的 user_id。
+        """
+        self.cursor.execute("""
+            SELECT friend_id FROM friends
+            WHERE user_id = ? AND status = 'accepted'
+            UNION
+            SELECT user_id FROM friends
+            WHERE friend_id = ? AND status = 'accepted'
+        """, (user_id, user_id))
+        return [row[0] for row in self.cursor.fetchall()]
+
+    def get_friends_user_info(self, user_id):
+        """
+        根据 user_id 查询该用户所有好友的信息。
+        """
+        # 查询好友的 user_id
+        self.cursor.execute(
+            "SELECT friend_id FROM friends WHERE user_id = ? AND status = 'accepted'", (user_id,)
+        )
+        friends_ids = [friend_id[0] for friend_id in self.cursor.fetchall()]
+
+        # 查询每个好友的用户信息
+        friends_info = []
+        for friend_id in friends_ids:
+            self.cursor.execute(
+                "SELECT user_id, username, email, last_login FROM users WHERE user_id = ?", (friend_id,)
+            )
+            friend_info = self.cursor.fetchone()
+            if friend_info:
+                friends_info.append(friend_info)
+
+        return friends_info
+
 
 if __name__ == "__main__":
     db = Database()
-    db.create_tables()
+    # db.create_tables()
     # 测试数据库功能
+    user_id = 1  # 假设的 user_id
+    friends_ids = db.get_friends_user_info(user_id)
+    print(f"User {user_id}'s friends: {friends_ids}")

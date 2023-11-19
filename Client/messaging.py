@@ -9,12 +9,13 @@ from utils.encryption import Encryption  # 修改导入语句
 from config import ENCRYPTION_KEY
 import sys
 from PyQt5 import QtWidgets, QtCore
+from Server.database import Database
 
 from Client.gui import GUI
 
 
 class Client:
-    def __init__(self, host, port):
+    def __init__(self, host, port, user_info):
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -22,6 +23,10 @@ class Client:
         self.connected = False
 
         self.app = QtWidgets.QApplication(sys.argv)  # 创建 QApplication 实例
+        self.login_info = user_info
+        self.user_id = user_info[0]
+        self.database = Database()
+
         self.gui = GUI(self)  # 创建 GUI 实例
         self.chat = Chat(self)  # 创建 Chat 实例
 
@@ -62,6 +67,9 @@ class Client:
 
     def on_send_button_click(self, message):
         self.send_message(message)
+
+    def get_friend_list(self):
+        return self.database.get_friends_user_info(self.user_id)
 
 
 class Chat:

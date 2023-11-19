@@ -49,7 +49,7 @@ def main():
         while not user_info:
             user_info = login()
 
-        client = Client(config.SERVER_HOST, config.SERVER_PORT)
+        client = Client(config.SERVER_HOST, config.SERVER_PORT, user_info)
         client.start()
     else:
         print("Invalid mode. Use 'server' or 'client'.")
