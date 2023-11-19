@@ -70,11 +70,12 @@ class Client:
                 encrypted_message = self.socket.recv(1024)
                 print('receive the message')
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
+                sender_id, message = message.split('#$#')
 
                 current_datetime = datetime.now()
                 formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
-                self.gui.display_message(f'{formatted_datetime} {self.get_friend_name(self.gui.current_friend)}:{message}')
+                self.gui.display_message(f'{formatted_datetime} {self.get_friend_name(int(sender_id))}:{message}')
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break

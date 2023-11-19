@@ -64,6 +64,7 @@ class Server:
 
                     if receiver_id in self.current_online_id_to_address:
                         self.send_message_to_client(
+                            sender_id=sender_id,
                             receiver_id=receiver_id,
                             message=content
                         )
@@ -81,11 +82,12 @@ class Server:
             del self.current_online_address_to_id[address]
             del self.clients[address]
 
-    def send_message_to_client(self, receiver_id, message):
+    def send_message_to_client(self, sender_id, receiver_id, message):
         try:
             if receiver_id in self.current_online_id_to_address:
                 receiver_address = self.current_online_id_to_address[receiver_id]
                 receiver_socket = self.clients[receiver_address]
+                message = f'{sender_id}#$#{message}'
                 receiver_socket.send(self.encryption.encrypt(message.encode('utf-8')))
             else:
                 print(f'{receiver_id} Offline')
