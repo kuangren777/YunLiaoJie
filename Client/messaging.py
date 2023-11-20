@@ -11,6 +11,7 @@ import sys
 from PyQt5 import QtWidgets, QtCore
 from Server.database import Database
 from datetime import datetime
+import pytz
 
 from Client.gui import GUI
 
@@ -66,21 +67,25 @@ class Client:
         return None
 
     def receive_messages(self):
-        while True:
+        while self.connected:
             try:
                 encrypted_message = self.socket.recv(1024)
-                print('receive the message')
+                if not encrypted_message:
+                    break  # 没有接收到消息时退出循环
+
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
                 sender_id, content = message.split('#$#')
 
-                current_datetime = datetime.now()
-                formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-                formatted_message = f'{formatted_datetime} {self.get_friend_name(int(sender_id))}: {content}'
+                sender_username = self.get_friend_name(int(sender_id))
+                current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))  # 将时间转换为时区感知的时间
+
+                # 格式化消息
+                formatted_message = f"{sender_username}: {content}"
 
                 # 显示消息
-                self.gui.display_message(int(sender_id), formatted_message)
+                self.gui.display_message(int(sender_id), formatted_message, current_datetime)
 
-                self.gui.update_friend_list_with_latest_message(sender_id, content, False)
+                self.gui.update_friend_list_with_latest_message(int(sender_id), content, False)
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break

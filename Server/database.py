@@ -4,6 +4,8 @@
 # @File    : database.py
 # @Tags    :
 import sqlite3
+from datetime import datetime
+import pytz
 
 
 class Database:
@@ -152,9 +154,12 @@ class Database:
         """
         向 chat_messages 表中添加一条消息记录。
         """
+        current_utc_time = datetime.utcnow().replace(tzinfo=pytz.utc)  # 获取当前 UTC 时间
+        formatted_time = current_utc_time.strftime('%Y-%m-%d %H:%M:%S')  # 格式化时间为字符串
+
         self.cursor.execute(
-            "INSERT INTO chat_messages (sender_id, receiver_id, message_type, content, timestamp) VALUES (?, ?, ?, ?, datetime('now'))",
-            (sender_id, receiver_id, 'text', content)  # 假设消息类型为 'text'
+            "INSERT INTO chat_messages (sender_id, receiver_id, message_type, content, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (sender_id, receiver_id, 'text', content, formatted_time)
         )
         self.conn.commit()
 

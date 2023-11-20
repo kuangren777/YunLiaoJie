@@ -4,7 +4,8 @@
 # @File    : gui.py
 # @Tags    :
 from PyQt5 import QtWidgets, QtGui, QtCore
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
 
 
 class GUI(QtWidgets.QWidget):
@@ -12,7 +13,9 @@ class GUI(QtWidgets.QWidget):
         super().__init__()
         self.client = client
         self.current_friend = None
+        self.last_message_time = None  # 新增变量以存储上一条消息的时间戳
         self.init_ui()
+        self.last_message_time_per_friend = {}  # 用于存储每个好友的最后消息时间戳
 
     def init_ui(self):
         # 假设 client 对象有一个 username 属性
@@ -113,43 +116,59 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
-    def display_message(self, sender_id, message):
+    def display_message(self, sender_id, message, timestamp):
+        last_time = self.last_message_time_per_friend.get(self.current_friend)
+        if self.should_display_time(timestamp, last_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
         # 检查消息发送者是否是当前选择的好友
         if sender_id != self.current_friend:
-            # 使用加粗字体显示消息
             message = f"<b>{message}</b>"
 
         self.messages_area.append(message)
+        self.last_message_time = timestamp  # 更新上一条消息的时间戳
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Return:
             self.on_send_button_click()
 
-    def display_message_normal(self, message):
+    def display_message_normal(self, message, timestamp):
+        # 获取当前聊天好友的最后一条消息时间戳
+        last_time = self.last_message_time_per_friend.get(self.current_friend)
+
+        # 检查是否需要显示时间
+        if self.should_display_time(timestamp, last_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
         self.messages_area.append(message)
+        self.last_message_time_per_friend[self.current_friend] = timestamp  # 更新当前聊天好友的最后消息时间戳
 
     def on_send_button_click(self):
         # 如果没有选择好友，不执行发送操作
         if self.current_friend is None:
-            # 显示提示消息，这里可以根据实际情况调整
             QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友")
             return
 
-        message = self.message_entry.text()
+        message = self.message_entry.text().strip()
         # 确保消息非空
-        if message:
-            self.client.send_message(self.current_friend, message)
+        if not message:
+            return
 
-            current_datetime = datetime.now()
-            formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        # 发送消息
+        self.client.send_message(self.current_friend, message)
 
-            self.display_message_normal(f"{formatted_datetime} 你: {message}")
-            self.message_entry.clear()
+        # 获取当前时间，并转换为时区感知的 datetime 对象
+        current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))
 
-            # 更新好友列表中的最新消息显示
-            latest_message = (message[:5] + '...') if len(message) > 5 else message
-            self.update_friend_list_with_latest_message(self.current_friend, latest_message, True)
+        # 显示消息，传递当前时间戳
+        self.display_message_normal(f"你: {message}", current_datetime)
 
+        # 清空消息输入框
+        self.message_entry.clear()
+
+        # 更新好友列表中的最新消息显示
+        latest_message = (message[:5] + '...') if len(message) > 5 else message
+        self.update_friend_list_with_latest_message(self.current_friend, latest_message, True)
 
     def on_friend_clicked(self, item):
         # 获取当前点击的列表项对应的自定义 widget
@@ -157,15 +176,35 @@ class GUI(QtWidgets.QWidget):
         # 通过 item_widget 中的子 widget（如 QLabel）获取数据
         friend_name = item_widget.findChild(QtWidgets.QLabel).text()
         friend_id = self.get_friend_id(friend_name)  # 假设这个方法能够根据好友名获取其 user_id
-        self.current_friend = friend_id  # 更新当前聊天的好友ID
-        self.current_friend_label.setText(f"正在与 {friend_name} 聊天")  # 更新标签
-        self.messages_area.clear()  # 清空聊天记录
+        self.current_friend = friend_id
+        self.current_friend_label.setText(f"{friend_name}")
+        self.messages_area.clear()
 
-        # 加载与该好友的聊天记录
+        # 获取当前好友的最后消息时间戳
+        last_time = self.last_message_time_per_friend.get(friend_id)
+
         chat_messages = self.client.database.get_chat_messages(self.client.user_id, friend_id)
         for content, sender_id, timestamp in chat_messages:
-            sender_name = "你" if sender_id == self.client.user_id else friend_name
-            self.messages_area.append(f"{timestamp} {sender_name}: {content}")
+            # 将 UTC 时间戳转换为本地时间
+            utc_time = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+            local_time = utc_time.replace(tzinfo=pytz.utc).astimezone(pytz.timezone('Asia/Shanghai'))
+
+            # 检查是否需要显示时间
+            if self.should_display_time(local_time, last_time):
+                self.messages_area.append(local_time.strftime('%Y-%m-%d %H:%M:%S'))
+
+            # 格式化消息显示
+            sender_name = "你" if int(sender_id) == self.client.user_id else friend_name
+            formatted_message = f"{sender_name}: {content}"
+
+            # 显示消息
+            self.messages_area.append(formatted_message)
+
+            # 更新当前好友的最后消息时间戳
+            last_time = local_time
+
+        # 更新该好友的最后消息时间戳
+        self.last_message_time_per_friend[friend_id] = last_time
 
     def get_friend_id(self, friend_name):
         for friend in self.client.all_friends:
@@ -189,6 +228,14 @@ class GUI(QtWidgets.QWidget):
                 # 更新最新消息显示
                 message_label.setText(f"{prefix}{latest_message}")
                 break  # 找到后退出循环
+
+    def should_display_time(self, current_time, last_time):
+        # 修改此方法以使用提供的 last_time
+        if not last_time or (current_time - last_time) > timedelta(minutes=5):
+            return True
+        if last_time.date() != current_time.date():
+            return True
+        return False
 
     def run(self):
         self.show()
