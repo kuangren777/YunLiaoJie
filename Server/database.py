@@ -150,28 +150,34 @@ class Database:
 
         return friends_info
 
-    def add_chat_message(self, sender_id, receiver_id, content):
+    def add_chat_message(self, sender_id, receiver_id, content, is_group=False):
         """
         向 chat_messages 表中添加一条消息记录。
         """
         current_utc_time = datetime.utcnow().replace(tzinfo=pytz.utc)  # 获取当前 UTC 时间
         formatted_time = current_utc_time.strftime('%Y-%m-%d %H:%M:%S')  # 格式化时间为字符串
 
+        message_type = 'group' if is_group else 'private'
         self.cursor.execute(
             "INSERT INTO chat_messages (sender_id, receiver_id, message_type, content, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (sender_id, receiver_id, 'text', content, formatted_time)
+            (sender_id, receiver_id, message_type, content, formatted_time)
         )
         self.conn.commit()
 
-    def get_chat_messages(self, user_id, friend_id):
+    def get_chat_messages(self, user_id, friend_id, message_type='private'):
         """
         获取两个用户之间的聊天记录。
+        :param user_id: 用户的ID
+        :param friend_id: 好友的ID
+        :param message_type: 消息类型（默认为 'private'）
+        :return: 聊天记录列表
         """
         self.cursor.execute("""
             SELECT content, sender_id, timestamp FROM chat_messages
-            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+            AND message_type = ?
             ORDER BY timestamp ASC
-        """, (user_id, friend_id, friend_id, user_id))
+        """, (user_id, friend_id, friend_id, user_id, message_type))
         return self.cursor.fetchall()
 
     def get_latest_message(self, user_id, friend_id):
@@ -189,15 +195,85 @@ class Database:
     # 在 Database 类中
     def get_latest_message_with_sender(self, user_id, friend_id):
         """
-        获取两个用户之间的最新聊天记录及发送者。
+        获取两个用户之间的最新私人聊天记录及发送者。
         """
         self.cursor.execute("""
             SELECT content, sender_id FROM chat_messages
-            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+            AND message_type = 'private'
             ORDER BY timestamp DESC LIMIT 1
         """, (user_id, friend_id, friend_id, user_id))
         result = self.cursor.fetchone()
         return result if result else ("", None)
+
+    def create_group(self, group_name, created_by):
+        """创建群组并返回群组ID"""
+        self.cursor.execute(
+            "INSERT INTO groups (group_name, created_by, created_at) VALUES (?, ?, datetime('now'))",
+            (group_name, created_by)
+        )
+        self.conn.commit()
+        return self.cursor.lastrowid
+
+    def add_group_member(self, group_id, user_id):
+        """添加用户到群组"""
+        self.cursor.execute(
+            "INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, datetime('now'))",
+            (group_id, user_id)
+        )
+        self.conn.commit()
+
+    def get_group_messages(self, group_id):
+        """
+        获取群组消息。
+        """
+        self.cursor.execute("""
+            SELECT content, sender_id, timestamp FROM chat_messages
+            WHERE receiver_id = ?
+            AND message_type = 'group'
+            ORDER BY timestamp ASC
+        """, (group_id,))
+        return self.cursor.fetchall()
+
+    def get_group_members(self, group_id):
+        """获取群组成员"""
+        self.cursor.execute("SELECT user_id FROM group_members WHERE group_id = ?", (group_id,))
+        return [row[0] for row in self.cursor.fetchall()]
+
+    def get_group_info(self, group_id):
+        """
+        获取群组的基本信息。
+        """
+        self.cursor.execute("SELECT group_name, created_by FROM groups WHERE group_id = ?", (group_id,))
+        return self.cursor.fetchone()
+
+    def get_groups_user_in(self, user_id):
+        """
+        获取用户所在的所有群组信息。
+        """
+        self.cursor.execute("""
+            SELECT g.group_id, g.group_name 
+            FROM groups g
+            JOIN group_members gm ON g.group_id = gm.group_id
+            WHERE gm.user_id = ?
+        """, (user_id,))
+        return self.cursor.fetchall()
+
+    def get_latest_group_message_with_sender(self, group_id):
+        """
+        获取指定群组中的最新消息及发送者。
+        """
+        # 查询最新的群聊消息及其发送者的ID
+        self.cursor.execute("""
+            SELECT cm.content, u.username 
+            FROM chat_messages cm 
+            JOIN users u ON cm.sender_id = u.user_id
+            WHERE cm.receiver_id = ? AND cm.message_type = 'group'
+            ORDER BY cm.timestamp DESC 
+            LIMIT 1
+        """, (group_id,))
+        result = self.cursor.fetchone()
+        return result if result else ("", "")
 
 
 # if __name__ == "__main__":

@@ -37,6 +37,8 @@ class Client:
             self.all_friends_id_to_name[friend[0]] = friend[1]
             self.all_friends_name_to_id[friend[1]] = friend[0]
 
+        self.all_groups = self.get_group_list()  # 获取群聊列表
+
         self.gui = GUI(self)  # 创建 GUI 实例
         self.chat = Chat(self)  # 创建 Chat 实例
 
@@ -51,10 +53,11 @@ class Client:
             print(f"Connection failed: {e}")
             return False
 
-    def send_message(self, current_friend, message):
-        if self.connected:  # 只有在连接成功后才发送消息
+    def send_message(self, recipient, message, is_group=False):
+        if self.connected:
             try:
-                message = f'{current_friend}#$#{message}'
+                message_type = 'group' if is_group else 'private'
+                message = f'{message_type}#$#{recipient}#$#{message}'
                 encrypted_message = self.encryption.encrypt(message)
                 self.socket.sendall(encrypted_message)
             except Exception as e:
@@ -71,21 +74,40 @@ class Client:
             try:
                 encrypted_message = self.socket.recv(1024)
                 if not encrypted_message:
-                    break  # 没有接收到消息时退出循环
+                    break
 
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
-                sender_id, content = message.split('#$#')
+                message_type, sender, content = message.split('#$#')
 
-                sender_username = self.get_friend_name(int(sender_id))
-                current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))  # 将时间转换为时区感知的时间
+                current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))
 
-                # 格式化消息
-                formatted_message = f"{sender_username}: {content}"
+                if message_type == 'group':
+                    group_id, sender_id = sender.split('###')
+                    group_name = self.get_group_name(int(group_id))
+                    sender_name = self.get_friend_name(int(sender_id))
 
-                # 显示消息
-                self.gui.display_message(int(sender_id), formatted_message, current_datetime)
+                    # 更新群组消息预览
+                    self.gui.update_list_item_message_preview_when_receive(int(group_id), content, sender_name, is_group=True)
 
-                self.gui.update_friend_list_with_latest_message(int(sender_id), content, False)
+                    # 检查是否是当前查看的群组
+                    if self.gui.current_item == int(group_id) and self.gui.current_chat_type == 'group':
+                        formatted_message = f"{content}"
+                        self.gui.display_group_message(int(group_id), int(sender_id), formatted_message,
+                                                       current_datetime)
+                    else:
+                        formatted_message = f"{content}"
+                        self.gui.display_current_group_message(int(group_id), int(sender_id), formatted_message,
+                                                               current_datetime)
+                else:
+                    # 更新好友消息预览
+                    self.gui.update_list_item_message_preview(int(sender), content, sender_name)
+
+                    # 检查是否是当前查看的好友
+                    if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
+                        self.gui.display_message(int(sender), content, current_datetime)
+                    else:
+                        formatted_message = f"<b>{content}</b>"
+                        self.gui.display_message(int(sender), formatted_message, current_datetime)
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break
@@ -104,6 +126,12 @@ class Client:
 
     def add_message_into_database(self, sender_id, receiver_id, content):
         self.database.add_chat_message(sender_id, receiver_id, content)
+
+    def get_group_list(self):
+        return self.database.get_groups_user_in(self.user_id)
+
+    def get_group_name(self, group_id):
+        return self.database.get_group_info(group_id)[0]
 
 
 class Chat:

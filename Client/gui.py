@@ -12,64 +12,28 @@ class GUI(QtWidgets.QWidget):
     def __init__(self, client):
         super().__init__()
         self.client = client
-        self.current_friend = None
-        self.last_message_time = None  # 新增变量以存储上一条消息的时间戳
+        self.current_item = None
+        self.current_chat_type = None
+        self.last_message_time = None
         self.init_ui()
-        self.last_message_time_per_friend = {}  # 用于存储每个好友的最后消息时间戳
+        self.last_message_time_per_chat = {}  # 用于存储每个聊天对象（好友或群聊）的最后消息时间戳
 
     def init_ui(self):
         # 假设 client 对象有一个 username 属性
         username = self.client.username if hasattr(self.client, 'username') else "未知用户"
         self.setWindowTitle(f"云聊界客户端 - {username}")
-
         self.setGeometry(100, 100, 800, 600)  # 设置窗口位置和大小
 
         # 总体布局为 Splitter，允许调节大小
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.friends_list = QtWidgets.QListWidget()  # 好友列表
+        self.friends_list.setMinimumWidth(200)
 
-        # 好友列表
-        self.friends_list = QtWidgets.QListWidget()
-        self.friends_list.setMinimumWidth(200)  # 设置最小宽度以确保可见性
+        # 加载好友和群聊列表
+        self.load_friends_and_groups()
 
-        if not self.client.all_friends:
-            print("好友列表为空。请确保有好友数据。")
-        else:
-            for friend in self.client.all_friends:
-                friend_id, friend_name = friend[0], friend[1]
-                latest_message, sender_id = self.client.database.get_latest_message_with_sender(self.client.user_id,
-                                                                                                friend_id)
-                prefix = "你:" if sender_id == self.client.user_id else "对方:"
-                latest_message = f"{prefix}{latest_message[:5]}..." if len(latest_message) > 5 else latest_message
-
-                # 创建自定义列表项
-                item_widget = QtWidgets.QWidget()
-                item_layout = QtWidgets.QVBoxLayout(item_widget)
-
-                # 用户名加粗放大显示
-                name_label = QtWidgets.QLabel(friend_name)
-                name_label.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Bold))
-                name_label.setObjectName(f"name_label_{friend_id}")  # 设置对象名称
-                item_layout.addWidget(name_label)
-
-                # 最近一条聊天记录小字显示
-                message_label = QtWidgets.QLabel(latest_message)
-                message_label.setFont(QtGui.QFont("Arial", 10))
-                message_label.setObjectName(f"message_label_{friend_id}")  # 设置对象名称
-                item_layout.addWidget(message_label)
-
-                # 创建列表项，将自定义 widget 作为其子项
-                item = QtWidgets.QListWidgetItem(self.friends_list)
-                item.setSizeHint(item_widget.sizeHint())  # 重要：设置列表项的大小
-
-                # 添加列表项到列表中
-                self.friends_list.addItem(item)
-                self.friends_list.setItemWidget(item, item_widget)
-
-        # 连接点击信号到槽函数
-        self.friends_list.itemClicked.connect(self.on_friend_clicked)
-
-        # 将好友列表添加到 Splitter
-        splitter.addWidget(self.friends_list)
+        splitter.addWidget(self.friends_list)  # 添加列表到 Splitter
+        self.friends_list.itemClicked.connect(self.on_item_clicked)  # 连接点击事件
 
         # 右侧布局
         right_widget = QtWidgets.QWidget()  # 右侧的 widget
@@ -116,16 +80,196 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
+    def load_friends_and_groups(self):
+        self.friends_list.clear()  # 清空列表
+
+        # 加载好友列表
+        if not self.client.all_friends:
+            print("好友列表为空。请确保有好友数据。")
+        else:
+            for friend in self.client.all_friends:
+                self.add_list_item(friend, is_friend=True)
+
+        # 加载群聊列表
+        if not self.client.all_groups:
+            print("群聊列表为空。请确保有群聊数据。")
+        else:
+            for group in self.client.all_groups:
+                self.add_list_item(group, is_friend=False)
+
+    def add_list_item(self, item, is_friend):
+        if is_friend:
+            friend_id, friend_name = item[0], item[1]
+            latest_message, sender_id = self.client.database.get_latest_message_with_sender(self.client.user_id,
+                                                                                            friend_id)
+            prefix = "你:" if int(sender_id) == self.client.user_id else "对方:"
+            latest_message = f"{prefix}{latest_message[:5]}..." if len(
+                latest_message) > 5 else f"{prefix}{latest_message}"
+            label_text = friend_name
+            name_object_name = f"name_label_{friend_id}"
+            message_object_name = f"message_label_{friend_id}"
+        else:
+            group_id, group_name = item[0], item[1]
+            latest_message, sender_name = self.client.database.get_latest_group_message_with_sender(group_id)
+            sender_prefix = '你' if self.client.username == sender_name else sender_name
+            latest_message = f"{sender_prefix}: {latest_message[:5]}..." if len(
+                latest_message) > 5 else f"{sender_prefix}: {latest_message}"
+            label_text = group_name
+            name_object_name = f"group_label_{group_id}"
+            message_object_name = f"group_message_label_{group_id}"
+
+        # 创建自定义列表项
+        item_widget = QtWidgets.QWidget()
+        item_layout = QtWidgets.QVBoxLayout(item_widget)
+
+        # 名称加粗放大显示
+        name_label = QtWidgets.QLabel(label_text)
+        name_label.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Bold))
+        name_label.setObjectName(name_object_name)  # 设置好友名称标签的对象名称
+        item_layout.addWidget(name_label)
+
+        # 最近一条聊天记录小字显示
+        message_label = QtWidgets.QLabel(latest_message)
+        message_label.setFont(QtGui.QFont("Arial", 10))
+        message_label.setObjectName(message_object_name)  # 设置消息预览标签的对象名称
+        item_layout.addWidget(message_label)
+
+        # 创建列表项，将自定义 widget 作为其子项
+        list_item = QtWidgets.QListWidgetItem(self.friends_list)
+        list_item.setSizeHint(item_widget.sizeHint())  # 设置列表项的大小
+
+        # 添加列表项到列表中
+        self.friends_list.addItem(list_item)
+        self.friends_list.setItemWidget(list_item, item_widget)
+
+    def on_item_clicked(self, item):
+        item_widget = self.friends_list.itemWidget(item)
+        label = item_widget.findChild(QtWidgets.QLabel)
+        if label.objectName().startswith("name_label_"):
+            self.handle_friend_click(label.text())
+        elif label.objectName().startswith("group_label_"):
+            self.handle_group_click(label.text())
+
+    def handle_group_click(self, group_name):
+        group_id = self.get_group_id(group_name)
+        if group_id is None:
+            return
+
+        self.current_item = group_id
+        self.current_chat_type = 'group'
+
+        self.current_friend_label.setText(f"{group_name}")
+        self.messages_area.clear()
+
+        # 加载与该群组的聊天记录
+        group_messages = self.client.database.get_group_messages(group_id)
+        for content, sender_id, timestamp in group_messages:
+            self.display_group_message_from_database(group_id, sender_id, content, timestamp)
+
+    def get_group_id(self, group_name):
+        for group in self.client.all_groups:
+            if group[1] == group_name:
+                return group[0]
+        return None
+
+    def handle_friend_click(self, friend_name):
+        friend_id = self.get_friend_id(friend_name)
+        if friend_id is None:
+            return
+
+        self.current_item = friend_id
+        self.current_chat_type = 'friend'
+
+        self.current_friend_label.setText(friend_name)
+        self.messages_area.clear()
+
+        # 加载与该好友的聊天记录
+        chat_messages = self.client.database.get_chat_messages(self.client.user_id, friend_id)
+        for content, sender_id, timestamp in chat_messages:
+            self.display_message_from_database(sender_id, content, timestamp)
+
+    def get_friend_id(self, friend_name):
+        for friend in self.client.all_friends:
+            if friend[1] == friend_name:
+                return friend[0]
+        return None
+
+    # display_message 函数用于显示实时收到的消息
     def display_message(self, sender_id, message, timestamp):
-        last_time = self.last_message_time_per_friend.get(self.current_friend)
+        # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
+        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
+
+        formatted_message = f"{sender_name}: {message}"
+
+        chat_id = self.current_item if self.current_chat_type == 'friend' else sender_id
+        last_time = self.get_last_message_time(chat_id)
         if self.should_display_time(timestamp, last_time):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
-        # 检查消息发送者是否是当前选择的好友
-        if sender_id != self.current_friend:
-            message = f"<b>{message}</b>"
+        self.messages_area.append(formatted_message)
+        self.update_last_message_time(chat_id, timestamp)
 
-        self.messages_area.append(message)
+    # display_message_from_database 函数用于显示从数据库中加载的消息
+    def display_message_from_database(self, sender_id, message, timestamp_str):
+        # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
+        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
+        formatted_message = f"{sender_name}: {message}"
+
+        timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.utc).astimezone(
+            pytz.timezone('Asia/Shanghai'))
+
+        # 检查是否需要显示时间
+        if self.should_display_time(timestamp, self.last_message_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.messages_area.append(formatted_message)
+        self.last_message_time = timestamp  # 更新上一条消息的时间戳
+
+    # display_group_message 函数用于显示实时收到的群聊消息
+    def display_group_message(self, group_id, sender_id, message, timestamp):
+        # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
+        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
+
+        formatted_message = f"{sender_name}: {message}"
+
+        chat_id = self.current_item if self.current_chat_type == 'friend' else sender_id
+        last_time = self.get_last_message_time(chat_id)
+        if self.should_display_time(timestamp, last_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.messages_area.append(formatted_message)
+        self.last_message_time = timestamp
+
+    # display_group_message 函数用于显示实时收到的群聊消息
+    def display_current_group_message(self, group_id, sender_id, message, timestamp):
+        # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
+        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
+        group_name = self.client.get_group_name(group_id)
+
+        formatted_message = f"<b>{group_name}@{sender_name}: {message}</b>"
+
+        chat_id = self.current_item if self.current_chat_type == 'friend' else sender_id
+        last_time = self.get_last_message_time(chat_id)
+        if self.should_display_time(timestamp, last_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.messages_area.append(formatted_message)
+        self.last_message_time = timestamp
+
+    # display_group_message_from_database 函数用于显示从数据库中加载的群聊消息
+    def display_group_message_from_database(self, group_id, sender_id, message, timestamp_str):
+        # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
+        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
+        formatted_message = f"{sender_name}: {message}"
+
+        timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.utc).astimezone(
+            pytz.timezone('Asia/Shanghai'))
+
+        # 检查是否需要显示时间
+        if self.should_display_time(timestamp, self.last_message_time):
+            self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.messages_area.append(formatted_message)
         self.last_message_time = timestamp  # 更新上一条消息的时间戳
 
     def keyPressEvent(self, event):
@@ -134,19 +278,19 @@ class GUI(QtWidgets.QWidget):
 
     def display_message_normal(self, message, timestamp):
         # 获取当前聊天好友的最后一条消息时间戳
-        last_time = self.last_message_time_per_friend.get(self.current_friend)
+        last_time = self.last_message_time_per_chat.get(self.current_item)
 
         # 检查是否需要显示时间
         if self.should_display_time(timestamp, last_time):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(message)
-        self.last_message_time_per_friend[self.current_friend] = timestamp  # 更新当前聊天好友的最后消息时间戳
+        self.last_message_time_per_chat[self.current_item] = timestamp  # 更新当前聊天好友的最后消息时间戳
 
     def on_send_button_click(self):
-        # 如果没有选择好友，不执行发送操作
-        if self.current_friend is None:
-            QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友")
+        # 如果没有选择好友或群组，不执行发送操作
+        if self.current_item is None:
+            QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友或群组")
             return
 
         message = self.message_entry.text().strip()
@@ -154,21 +298,48 @@ class GUI(QtWidgets.QWidget):
         if not message:
             return
 
-        # 发送消息
-        self.client.send_message(self.current_friend, message)
+        # 发送消息并更新列表
+        if self.current_chat_type == 'friend':
+            self.client.send_message(self.current_item, message)
+            self.update_list_item_message_preview(self.current_item, message, True)
+        elif self.current_chat_type == 'group':
+            self.client.send_message(self.current_item, message, is_group=True)
+            self.update_list_item_message_preview(self.current_item, message, True, is_group=True)
 
         # 获取当前时间，并转换为时区感知的 datetime 对象
         current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))
-
-        # 显示消息，传递当前时间戳
         self.display_message_normal(f"你: {message}", current_datetime)
 
         # 清空消息输入框
         self.message_entry.clear()
 
-        # 更新好友列表中的最新消息显示
-        latest_message = (message[:5] + '...') if len(message) > 5 else message
-        self.update_friend_list_with_latest_message(self.current_friend, latest_message, True)
+    def update_list_item_message_preview(self, chat_id, message, is_sender, is_group=False):
+        for index in range(self.friends_list.count()):
+            item = self.friends_list.item(index)
+            widget = self.friends_list.itemWidget(item)
+
+            label_name = f"group_message_label_{chat_id}" if is_group else f"message_label_{chat_id}"
+            message_label = widget.findChild(QtWidgets.QLabel, label_name)
+
+            if message_label:
+                short_message = (message[:5] + '...') if len(message) > 5 else message
+                prefix = "你:"
+                message_label.setText(f"{prefix}{short_message}")
+                break
+
+    def update_list_item_message_preview_when_receive(self, chat_id, message, sender_name, is_group=False):
+        for index in range(self.friends_list.count()):
+            item = self.friends_list.item(index)
+            widget = self.friends_list.itemWidget(item)
+
+            label_name = f"group_message_label_{chat_id}" if is_group else f"message_label_{chat_id}"
+            message_label = widget.findChild(QtWidgets.QLabel, label_name)
+
+            if message_label:
+                short_message = (message[:5] + '...') if len(message) > 5 else message
+                prefix = f'{sender_name}:'
+                message_label.setText(f"{prefix}{short_message}")
+                break
 
     def on_friend_clicked(self, item):
         # 获取当前点击的列表项对应的自定义 widget
@@ -176,12 +347,12 @@ class GUI(QtWidgets.QWidget):
         # 通过 item_widget 中的子 widget（如 QLabel）获取数据
         friend_name = item_widget.findChild(QtWidgets.QLabel).text()
         friend_id = self.get_friend_id(friend_name)  # 假设这个方法能够根据好友名获取其 user_id
-        self.current_friend = friend_id
+        self.current_item = friend_id
         self.current_friend_label.setText(f"{friend_name}")
         self.messages_area.clear()
 
         # 获取当前好友的最后消息时间戳
-        last_time = self.last_message_time_per_friend.get(friend_id)
+        last_time = self.last_message_time_per_chat.get(friend_id)
 
         chat_messages = self.client.database.get_chat_messages(self.client.user_id, friend_id)
         for content, sender_id, timestamp in chat_messages:
@@ -204,7 +375,7 @@ class GUI(QtWidgets.QWidget):
             last_time = local_time
 
         # 更新该好友的最后消息时间戳
-        self.last_message_time_per_friend[friend_id] = last_time
+        self.last_message_time_per_chat[friend_id] = last_time
 
     def get_friend_id(self, friend_name):
         for friend in self.client.all_friends:
@@ -236,6 +407,14 @@ class GUI(QtWidgets.QWidget):
         if last_time.date() != current_time.date():
             return True
         return False
+
+    # 更新最后消息时间的函数
+    def update_last_message_time(self, chat_id, timestamp):
+        self.last_message_time_per_chat[chat_id] = timestamp
+
+    # 获取最后消息时间的函数
+    def get_last_message_time(self, chat_id):
+        return self.last_message_time_per_chat.get(chat_id)
 
     def run(self):
         self.show()

@@ -46,28 +46,48 @@ class Server:
                 print(f"Received message from {address}: {message}")
 
                 if '#@#' in message:
+                    """
+                    上线消息，格式：#@#<user_id>
+                    """
                     user_id = message[3:]
                     self.current_online_id_to_address[user_id] = address
                     self.current_online_address_to_id[address] = user_id
                     print(f'current online:{self.current_online_id_to_address}')
+
                 else:
-                    message = message.split('#$#')
-                    sender_id = self.current_online_address_to_id[address]
-                    receiver_id = message[0]
-                    content = message[1]
 
-                    self.database.add_chat_message(
-                        sender_id=sender_id,
-                        receiver_id=receiver_id,
-                        content=content
-                    )
+                    message_type, recipient, content = message.split('#$#')
 
-                    if receiver_id in self.current_online_id_to_address:
-                        self.send_message_to_client(
+                    if message_type == 'group':
+                        """
+                        群组消息，格式：group#$#<group_id>#$#<message_content>
+                        """
+                        self.handle_group_message(client_socket, recipient, content)
+
+                    else:
+                        """
+                        个人消息，格式：private#$#<receiver_id>#$#<content>
+                        """
+                        sender_id = self.current_online_address_to_id[address]
+                        receiver_id = recipient
+                        content = content
+
+                        self.database.add_chat_message(
                             sender_id=sender_id,
                             receiver_id=receiver_id,
-                            message=content
+                            content=content
                         )
+
+                        if receiver_id in self.current_online_id_to_address:
+
+                            print(f'[info] Send message to client # sender_id:{sender_id},'
+                                  f'receiver_id:{receiver_id}, message:{message}.', end='')
+                            self.send_message_to_client(
+                                sender_id=sender_id,
+                                receiver_id=receiver_id,
+                                message=content
+                            )
+                            print('Done.')
 
             except socket.error:
                 break
@@ -87,12 +107,28 @@ class Server:
             if receiver_id in self.current_online_id_to_address:
                 receiver_address = self.current_online_id_to_address[receiver_id]
                 receiver_socket = self.clients[receiver_address]
-                message = f'{sender_id}#$#{message}'
+                message = f'private#$#{sender_id}#$#{message}'
                 receiver_socket.send(self.encryption.encrypt(message.encode('utf-8')))
             else:
                 print(f'{receiver_id} Offline')
         except socket.error as e:
             print(f'[info] send_message_to_client error as {e}')
+
+    def handle_group_message(self, client_socket, recipient, content):
+        # 假设消息格式是：#$#group#$#<group_id>#$#<message_content>
+        group_id = recipient
+        sender_id = self.current_online_address_to_id[client_socket.getpeername()]
+
+        # 将消息保存到数据库
+        self.database.add_chat_message(sender_id, group_id, content, is_group=True)
+
+        # 获取群组成员并转发消息
+        group_members = self.database.get_group_members(group_id)
+        for member_id in group_members:
+            if str(member_id) != sender_id and str(member_id) in self.current_online_id_to_address:
+                receiver_socket = self.clients[self.current_online_id_to_address[str(member_id)]]
+                group_message = f'group#$#{group_id}###{sender_id}#$#{content}'
+                receiver_socket.send(self.encryption.encrypt(group_message.encode('utf-8')))
 
 
 if __name__ == "__main__":
