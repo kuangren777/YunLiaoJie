@@ -87,7 +87,8 @@ class Client:
                     sender_name = self.get_friend_name(int(sender_id))
 
                     # 更新群组消息预览
-                    self.gui.update_list_item_message_preview_when_receive(int(group_id), content, sender_name, is_group=True)
+                    self.gui.update_list_item_message_preview_when_receive(int(group_id), content, sender_name,
+                                                                           is_group=True)
 
                     # 检查是否是当前查看的群组
                     if self.gui.current_item == int(group_id) and self.gui.current_chat_type == 'group':

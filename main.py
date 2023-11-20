@@ -16,6 +16,7 @@ from Server.authentication import Authentication
 from Client.login_gui import LoginWindow
 import config
 
+
 def main():
     app = QApplication(sys.argv)
 
@@ -49,6 +50,7 @@ def main():
         sys.exit(1)
 
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
