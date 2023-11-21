@@ -121,7 +121,7 @@ class Client:
                     # 检查是否是当前查看的好友
                     if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
 
-                        formatted_message = f"{sender_name}: {message}"
+                        formatted_message = f"{sender_name}: {content}"
                         self.gui.display_message(int(sender), formatted_message, current_datetime)
 
                     else:
