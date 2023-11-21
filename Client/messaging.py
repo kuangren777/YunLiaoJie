@@ -16,6 +16,11 @@ import pytz
 from Client.gui import GUI
 
 
+class LoginException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
 class Client:
     def __init__(self, host, port, user_info):
         self.host: str = host
@@ -77,6 +82,13 @@ class Client:
                     break
 
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
+                if '##@@##OffsiteLogin##@##' in message:
+                    self.gui.display_error_message('[OFF-LINE] Another user logged in with your user ID. You have '
+                                                   'been disconnected.')
+                    self.connected = False
+                    raise LoginException('[OFF-LINE] Another user logged in with your user ID. You have been '
+                                         'disconnected.')
+
                 message_type, sender, content = message.split('#$#')
 
                 current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))

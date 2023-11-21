@@ -304,6 +304,10 @@ class GUI(QtWidgets.QWidget):
         for content, sender_id, timestamp in group_messages:
             self.display_group_message_from_database(group_id, sender_id, content, timestamp)
 
+        if not self.client.connected:
+            self.display_error_message('[OFF-LINE] Another user logged in with your user ID. You have '
+                                       'been disconnected.')
+
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
         self.send_file_button.setVisible(False)
@@ -330,6 +334,10 @@ class GUI(QtWidgets.QWidget):
         for content, sender_id, timestamp in chat_messages:
             self.display_message_from_database(sender_id, content, timestamp)
 
+        if not self.client.connected:
+            self.display_error_message('[OFF-LINE] Another user logged in with your user ID. You have '
+                                       'been disconnected.')
+
         self.friend_info_button.setVisible(True)
         self.delete_friend_button.setVisible(True)
         self.send_file_button.setVisible(True)
@@ -339,6 +347,16 @@ class GUI(QtWidgets.QWidget):
             if friend[1] == friend_name:
                 return friend[0]
         return None
+
+    def display_error_message(self, message):
+        formatted_message = f"<b><font color='red'>{message}</font></b>"
+
+        self.messages_area.append(formatted_message)
+        self.messages_area.append(formatted_message)
+        self.messages_area.append(formatted_message)
+
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
 
     # display_message 函数用于显示实时收到的消息
     def display_message(self, sender_id, message, timestamp):

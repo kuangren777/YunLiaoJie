@@ -50,8 +50,15 @@ class Server:
                     上线消息，格式：#@#<user_id>
                     """
                     user_id = message[3:]
+                    if user_id in self.current_online_id_to_address:
+                        old_address = self.current_online_id_to_address[user_id]
+                        old_socket = self.clients[old_address]
+                        self.notify_disconnection(old_socket)  # 通知旧连接
+                        old_socket.close()  # 关闭旧连接
+                        self.remove_client(old_address)  # 移除旧连接信息
                     self.current_online_id_to_address[user_id] = address
                     self.current_online_address_to_id[address] = user_id
+                    self.clients[address] = client_socket  # 更新为新连接
                     print(f'current online:{self.current_online_id_to_address}')
 
                 else:
@@ -94,6 +101,18 @@ class Server:
 
         client_socket.close()
         self.remove_client(address)
+
+    def notify_disconnection(self, client_socket):
+        """
+        通知客户端其它地方有新的登录，这个连接将被断开。
+        """
+        try:
+            disconnect_message = "##@@##OffsiteLogin##@##"
+            encrypted_message = self.encryption.encrypt(disconnect_message.encode('utf-8'))
+            client_socket.send(encrypted_message)
+            print(f"Notified client of disconnection.")
+        except socket.error as e:
+            print(f"Error notifying client of disconnection: {e}")
 
     def remove_client(self, address):
         if address in self.current_online_address_to_id:
