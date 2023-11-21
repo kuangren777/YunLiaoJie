@@ -100,14 +100,20 @@ class Client:
                         self.gui.display_current_group_message(int(group_id), int(sender_id), formatted_message,
                                                                current_datetime)
                 else:
+                    sender_name = self.get_friend_name(int(sender))
                     # 更新好友消息预览
                     self.gui.update_list_item_message_preview(int(sender), content, sender_name)
 
+                    sender_name = "你" if sender == self.user_id else sender_name
+
                     # 检查是否是当前查看的好友
                     if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
-                        self.gui.display_message(int(sender), content, current_datetime)
+
+                        formatted_message = f"{sender_name}: {message}"
+                        self.gui.display_message(int(sender), formatted_message, current_datetime)
+
                     else:
-                        formatted_message = f"<b>{content}</b>"
+                        formatted_message = f"<b>{sender_name}: {content}</b>"
                         self.gui.display_message(int(sender), formatted_message, current_datetime)
             except Exception as e:
                 print(f"Error receiving message: {e}")

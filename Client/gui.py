@@ -30,17 +30,41 @@ class GUI(QtWidgets.QWidget):
         # 假设 client 对象有一个 username 属性
         username = self.client.username if hasattr(self.client, 'username') else "未知用户"
         self.setWindowTitle(f"云聊界客户端 - {username}")
-        self.setGeometry(100, 100, 800, 600)  # 设置窗口位置和大小
+        self.setGeometry(100, 100, 1000, 700)  # 设置窗口位置和大小
 
         # 总体布局为 Splitter，允许调节大小
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        self.friends_list = QtWidgets.QListWidget()  # 好友列表
+
+        # 左侧布局
+        left_widget = QtWidgets.QWidget()  # 创建一个新的 widget 用于左侧布局
+        left_layout = QtWidgets.QVBoxLayout(left_widget)  # 左侧使用垂直布局
+
+        # 在好友列表上方添加操作按钮
+        top_layout = QtWidgets.QHBoxLayout()
+
+        # 添加朋友按钮
+        self.add_friend_button = QtWidgets.QPushButton("添加朋友")
+        self.add_friend_button.clicked.connect(self.on_add_friend_button_click)  # 需要定义该方法
+        top_layout.addWidget(self.add_friend_button)
+
+        # 发起群聊按钮
+        self.create_group_button = QtWidgets.QPushButton("发起群聊")
+        self.create_group_button.clicked.connect(self.on_create_group_button_click)  # 需要定义该方法
+        top_layout.addWidget(self.create_group_button)
+
+        # 将顶部布局添加到左侧布局
+        left_layout.addLayout(top_layout)
+
+        # 好友列表
+        self.friends_list = QtWidgets.QListWidget()
         self.friends_list.setMinimumWidth(200)
+        left_layout.addWidget(self.friends_list)  # 将好友列表添加到左侧布局
 
         # 加载好友和群聊列表
         self.load_friends_and_groups()
 
-        splitter.addWidget(self.friends_list)  # 添加列表到 Splitter
+        # 将左侧 widget 添加到 Splitter
+        splitter.addWidget(left_widget)
         self.friends_list.itemClicked.connect(self.on_item_clicked)  # 连接点击事件
 
         # 右侧布局
@@ -59,17 +83,23 @@ class GUI(QtWidgets.QWidget):
         # 好友信息按钮
         self.friend_info_button = QtWidgets.QPushButton("好友信息")
         self.friend_info_button.clicked.connect(self.on_friend_info_button_click)  # 需要定义该方法
-        self.friend_actions_layout.addWidget(self.friend_info_button)
+        self.friend_actions_layout.addWidget(self.friend_info_button, 1)
+
+        # 在当前聊天好友的名称标签下添加发送文件按钮
+        self.send_file_button = QtWidgets.QPushButton("发送文件")
+        self.send_file_button.clicked.connect(self.on_send_file_button_click)  # 需要定义该方法
+        self.friend_actions_layout.addWidget(self.send_file_button, 1)
 
         # 删除好友按钮
         self.delete_friend_button = QtWidgets.QPushButton("删除好友")
         self.delete_friend_button.clicked.connect(self.on_delete_friend_button_click)  # 需要定义该方法
         self.delete_friend_button.setStyleSheet("QPushButton { color: red; }")  # 设置文本颜色为红色
-        self.friend_actions_layout.addWidget(self.delete_friend_button)
+        self.friend_actions_layout.addWidget(self.delete_friend_button, 1)
 
         # 只有在选中好友时，按钮才可见
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
+        self.send_file_button.setVisible(False)
 
         right_layout.addLayout(self.friend_actions_layout)
 
@@ -107,6 +137,21 @@ class GUI(QtWidgets.QWidget):
 
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
+
+    # 发送文件按钮点击事件处理函数
+    def on_send_file_button_click(self):
+        # 此处添加处理发送文件的逻辑
+        pass
+
+    # 添加朋友按钮点击事件处理函数
+    def on_add_friend_button_click(self):
+        # 此处添加处理添加朋友的逻辑
+        pass
+
+    # 发起群聊按钮点击事件处理函数
+    def on_create_group_button_click(self):
+        # 此处添加处理发起群聊的逻辑
+        pass
 
     def on_friend_info_button_click(self):
         # 显示选中的好友信息
@@ -260,6 +305,7 @@ class GUI(QtWidgets.QWidget):
 
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
+        self.send_file_button.setVisible(False)
 
     def get_group_id(self, group_name):
         for group in self.client.all_groups:
@@ -285,6 +331,7 @@ class GUI(QtWidgets.QWidget):
 
         self.friend_info_button.setVisible(True)
         self.delete_friend_button.setVisible(True)
+        self.send_file_button.setVisible(True)
 
     def get_friend_id(self, friend_name):
         for friend in self.client.all_friends:
@@ -295,16 +342,13 @@ class GUI(QtWidgets.QWidget):
     # display_message 函数用于显示实时收到的消息
     def display_message(self, sender_id, message, timestamp):
         # 获取消息发送者的用户名，如果是当前用户，则显示 "你"
-        sender_name = "你" if sender_id == self.client.user_id else self.client.get_friend_name(sender_id)
-
-        formatted_message = f"{sender_name}: {message}"
 
         chat_id = self.current_item if self.current_chat_type == 'friend' else sender_id
         last_time = self.get_last_message_time(chat_id)
         if self.should_display_time(timestamp, last_time):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
-        self.messages_area.append(formatted_message)
+        self.messages_area.append(message)
         self.update_last_message_time(chat_id, timestamp)
 
     # display_message_from_database 函数用于显示从数据库中加载的消息
