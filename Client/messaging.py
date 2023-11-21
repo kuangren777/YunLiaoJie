@@ -134,6 +134,20 @@ class Client:
     def get_group_name(self, group_id):
         return self.database.get_group_info(group_id)[0]
 
+    def get_friend_info(self, friend_id):
+        # 假设 database 方法 get_friend_info_by_id 返回好友的详细信息
+        return self.database.get_user_info_by_id(friend_id)
+
+    def delete_friend(self, friend_id):
+        # 这里应该实现删除好友的逻辑，例如调用数据库的方法
+        # 假设 delete_friend_by_id 是在数据库操作类中实现的一个方法
+        if self.database.delete_friend_by_id(self.user_id, friend_id):
+            print(f"好友 {friend_id} 已被删除。")
+            return True
+        else:
+            print(f"无法删除好友 {friend_id}。")
+            return False
+
 
 class Chat:
     def __init__(self, client):

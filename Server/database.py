@@ -78,6 +78,20 @@ class Database:
                             (username,))
         return self.cursor.fetchone()
 
+    def get_user_info_by_id(self, user_id):
+        """
+        查询用户信息。
+        """
+        self.cursor.execute("SELECT user_id, username, password_hash, email, last_login FROM users WHERE user_id = ?",
+                            (user_id,))
+        user_id, username, password_hash, email, last_login = self.cursor.fetchone()
+        return {
+            '用户账号': user_id,
+            '用户名': username,
+            'E-mail': email,
+            '最近上线': last_login,
+        }
+
     def update_user_status(self, user_id, status):
         """
         更新用户的在线状态。
@@ -274,6 +288,16 @@ class Database:
         """, (group_id,))
         result = self.cursor.fetchone()
         return result if result else ("", "")
+
+    def delete_friend_by_id(self, user_id, friend_id):
+        # 这里写数据库删除逻辑，下面仅为示例
+        try:
+            with self.conn:
+                self.cursor.execute("DELETE FROM friends WHERE user_id = ? AND friend_id = ?", (user_id, friend_id))
+            return True
+        except Exception as e:
+            print(f"Error deleting friend: {e}")
+            return False
 
 
 # if __name__ == "__main__":

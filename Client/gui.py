@@ -4,19 +4,27 @@
 # @File    : gui.py
 # @Tags    :
 from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5.QtCore import pyqtSignal
 from datetime import datetime, timedelta
 import pytz
+import threading
 
 
 class GUI(QtWidgets.QWidget):
+    display_friend_info_signal = pyqtSignal(dict)
+
     def __init__(self, client):
         super().__init__()
         self.client = client
+        self.info_dialog = None  # 初始化为 None
         self.current_item = None
         self.current_chat_type = None
         self.last_message_time = None
         self.init_ui()
         self.last_message_time_per_chat = {}  # 用于存储每个聊天对象（好友或群聊）的最后消息时间戳
+
+        # 将信号连接到槽函数
+        self.display_friend_info_signal.connect(self.show_friend_info)
 
     def init_ui(self):
         # 假设 client 对象有一个 username 属性
@@ -44,6 +52,26 @@ class GUI(QtWidgets.QWidget):
         self.current_friend_label.setAlignment(QtCore.Qt.AlignCenter)
         self.current_friend_label.setFont(QtGui.QFont("Arial", 14))
         right_layout.addWidget(self.current_friend_label)
+
+        # 添加好友操作按钮
+        self.friend_actions_layout = QtWidgets.QHBoxLayout()
+
+        # 好友信息按钮
+        self.friend_info_button = QtWidgets.QPushButton("好友信息")
+        self.friend_info_button.clicked.connect(self.on_friend_info_button_click)  # 需要定义该方法
+        self.friend_actions_layout.addWidget(self.friend_info_button)
+
+        # 删除好友按钮
+        self.delete_friend_button = QtWidgets.QPushButton("删除好友")
+        self.delete_friend_button.clicked.connect(self.on_delete_friend_button_click)  # 需要定义该方法
+        self.delete_friend_button.setStyleSheet("QPushButton { color: red; }")  # 设置文本颜色为红色
+        self.friend_actions_layout.addWidget(self.delete_friend_button)
+
+        # 只有在选中好友时，按钮才可见
+        self.friend_info_button.setVisible(False)
+        self.delete_friend_button.setVisible(False)
+
+        right_layout.addLayout(self.friend_actions_layout)
 
         # 消息显示区域
         self.messages_area = QtWidgets.QTextEdit()
@@ -80,22 +108,86 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
+    def on_friend_info_button_click(self):
+        # 显示选中的好友信息
+        friend_id = self.current_item  # 当前选中的好友 ID
+        if friend_id is not None:
+            # 在主线程中执行操作，不需要开启新线程
+            friend_info = self.client.get_friend_info(friend_id)
+            self.show_friend_info(friend_info)
+        else:
+            QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友")
+
+    # 将 show_friend_info 调整为接收信号
+    @QtCore.pyqtSlot(dict)
+    def show_friend_info(self, friend_info):
+        # 如果已经存在一个信息对话框，先关闭它
+        if self.info_dialog is not None:
+            self.info_dialog.close()
+            self.info_dialog = None
+
+        if friend_info:
+            # 创建一个新的对话框来显示好友信息
+            self.info_dialog = QtWidgets.QDialog(self)
+            self.info_dialog.setWindowTitle("好友信息")
+            self.info_dialog.setWindowModality(QtCore.Qt.NonModal)  # 设置为非模态
+
+            # 设置对话框大小
+            self.info_dialog.resize(400, 200)  # 设置为400x300的大小
+
+            # 设置对话框布局
+            layout = QtWidgets.QVBoxLayout()
+
+            # 假设 friend_info 是一个包含各种信息的字典
+            for key, value in friend_info.items():
+                layout.addWidget(QtWidgets.QLabel(f"{key}: {value}"))
+
+            self.info_dialog.setLayout(layout)
+            self.info_dialog.finished.connect(self.on_info_dialog_closed)  # 连接对话框关闭信号
+            self.info_dialog.show()  # 非模态显示对话框
+        else:
+            QtWidgets.QMessageBox.warning(self, "错误", "无法获取好友信息。")
+
+    def on_delete_friend_button_click(self):
+        friend_id = self.current_item  # 当前选中的好友 ID
+        if friend_id is not None:
+            reply = QtWidgets.QMessageBox.question(
+                self, '确认删除', '你确定要删除这位好友吗？',
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+
+            if reply == QtWidgets.QMessageBox.Yes:
+                if self.client.delete_friend(friend_id):
+                    QtWidgets.QMessageBox.information(self, "删除成功", "好友已经被成功删除。")
+                    self.load_friends_and_groups()  # 刷新好友列表
+                else:
+                    QtWidgets.QMessageBox.warning(self, "删除失败", "无法删除该好友。")
+        else:
+            QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个好友。")
+
+    def on_info_dialog_closed(self):
+        # 对话框关闭时的处理
+        self.info_dialog = None  # 将对话框引用设置为 None
+
     def load_friends_and_groups(self):
-        self.friends_list.clear()  # 清空列表
+        # 清空当前的好友和群组列表
+        self.friends_list.clear()
 
-        # 加载好友列表
-        if not self.client.all_friends:
-            print("好友列表为空。请确保有好友数据。")
-        else:
-            for friend in self.client.all_friends:
-                self.add_list_item(friend, is_friend=True)
+        # 重新从客户端加载好友和群组
+        self.client.all_friends = self.client.get_friend_list()
+        self.client.all_groups = self.client.get_group_list()
 
-        # 加载群聊列表
-        if not self.client.all_groups:
-            print("群聊列表为空。请确保有群聊数据。")
-        else:
-            for group in self.client.all_groups:
-                self.add_list_item(group, is_friend=False)
+        # 添加好友和群组到列表
+        for friend in self.client.all_friends:
+            self.add_list_item(friend, is_friend=True)
+        for group in self.client.all_groups:
+            self.add_list_item(group, is_friend=False)
+
+        # 可能还需要更新当前选中的项目或清除消息区域等
+        self.current_item = None
+        if hasattr(self, 'messages_area'):
+            self.messages_area.clear()
+        if hasattr(self, 'current_friend_label'):
+            self.current_friend_label.setText("选择一个好友以开始聊天")
 
     def add_list_item(self, item, is_friend):
         if is_friend:
@@ -166,6 +258,9 @@ class GUI(QtWidgets.QWidget):
         for content, sender_id, timestamp in group_messages:
             self.display_group_message_from_database(group_id, sender_id, content, timestamp)
 
+        self.friend_info_button.setVisible(False)
+        self.delete_friend_button.setVisible(False)
+
     def get_group_id(self, group_name):
         for group in self.client.all_groups:
             if group[1] == group_name:
@@ -187,6 +282,9 @@ class GUI(QtWidgets.QWidget):
         chat_messages = self.client.database.get_chat_messages(self.client.user_id, friend_id)
         for content, sender_id, timestamp in chat_messages:
             self.display_message_from_database(sender_id, content, timestamp)
+
+        self.friend_info_button.setVisible(True)
+        self.delete_friend_button.setVisible(True)
 
     def get_friend_id(self, friend_name):
         for friend in self.client.all_friends:
