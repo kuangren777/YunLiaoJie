@@ -18,21 +18,21 @@ from Client.gui import GUI
 
 class Client:
     def __init__(self, host, port, user_info):
-        self.host = host
-        self.port = port
+        self.host: str = host
+        self.port: int = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encryption = Encryption(key=ENCRYPTION_KEY)
-        self.connected = False
+        self.connected: bool = False
 
         self.app = QtWidgets.QApplication(sys.argv)  # 创建 QApplication 实例
-        self.login_info = user_info
-        self.user_id = user_info[0]
-        self.username = user_info[1]
+        self.login_info: tuple = user_info
+        self.user_id: int = user_info[0]
+        self.username: str = user_info[1]
         self.database = Database()
 
         self.all_friends = self.get_friend_list()
-        self.all_friends_id_to_name = {}
-        self.all_friends_name_to_id = {}
+        self.all_friends_id_to_name: dict = {}
+        self.all_friends_name_to_id: dict = {}
         for friend in self.all_friends:
             self.all_friends_id_to_name[friend[0]] = friend[1]
             self.all_friends_name_to_id[friend[1]] = friend[0]
@@ -53,7 +53,7 @@ class Client:
             print(f"Connection failed: {e}")
             return False
 
-    def send_message(self, recipient, message, is_group=False):
+    def send_message(self, recipient: str, message: str, is_group: bool = False):
         if self.connected:
             try:
                 message_type = 'group' if is_group else 'private'
@@ -63,7 +63,7 @@ class Client:
             except Exception as e:
                 print(f"Failed to send message: {e}")
 
-    def get_friend_name(self, friend_id):
+    def get_friend_name(self, friend_id: int):
         for friend in self.all_friends:
             if friend[0] == friend_id:
                 return friend[1]
@@ -125,7 +125,7 @@ class Client:
             self.gui.run()
             sys.exit(self.app.exec_())  # 启动事件循环
 
-    def on_send_button_click(self, message):
+    def on_send_button_click(self, message: str):
         self.send_message(message)
 
     def get_friend_list(self):
@@ -134,7 +134,7 @@ class Client:
     def add_message_into_database(self, sender_id, receiver_id, content):
         self.database.add_chat_message(sender_id, receiver_id, content)
 
-    def get_group_list(self):
+    def get_group_list(self) -> [(int, str)]:
         return self.database.get_groups_user_in(self.user_id)
 
     def get_group_name(self, group_id):

@@ -150,15 +150,15 @@ class Database:
         self.cursor.execute(
             "SELECT friend_id FROM friends WHERE user_id = ? AND status = 'accepted'", (user_id,)
         )
-        friends_ids = [friend_id[0] for friend_id in self.cursor.fetchall()]
+        friends_ids: list = [friend_id[0] for friend_id in self.cursor.fetchall()]
 
         # 查询每个好友的用户信息
-        friends_info = []
+        friends_info: list = []
         for friend_id in friends_ids:
             self.cursor.execute(
                 "SELECT user_id, username, email, last_login FROM users WHERE user_id = ?", (friend_id,)
             )
-            friend_info = self.cursor.fetchone()
+            friend_info: tuple = self.cursor.fetchone()
             if friend_info:
                 friends_info.append(friend_info)
 

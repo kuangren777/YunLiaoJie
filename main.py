@@ -36,7 +36,7 @@ def main():
             login_window = LoginWindow(auth)
             result = login_window.exec_()  # 使用 exec_ 以模态方式运行
             if result == QDialog.Accepted:
-                user_info = login_window.user_info
+                user_info: tuple = login_window.user_info
                 client = Client(config.SERVER_HOST, config.SERVER_PORT, user_info)
                 client.start()
                 break

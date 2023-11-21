@@ -6,6 +6,7 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import pyqtSignal
 from datetime import datetime, timedelta
+from PyQt5.QtWidgets import QApplication
 import pytz
 import threading
 
@@ -28,7 +29,7 @@ class GUI(QtWidgets.QWidget):
 
     def init_ui(self):
         # 假设 client 对象有一个 username 属性
-        username = self.client.username if hasattr(self.client, 'username') else "未知用户"
+        username: str = self.client.username if hasattr(self.client, 'username') else "未知用户"
         self.setWindowTitle(f"云聊界客户端 - {username}")
         self.setGeometry(100, 100, 1000, 700)  # 设置窗口位置和大小
 
@@ -349,6 +350,8 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
         self.update_last_message_time(chat_id, timestamp)
 
     # display_message_from_database 函数用于显示从数据库中加载的消息
@@ -365,6 +368,8 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(formatted_message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
         self.last_message_time = timestamp  # 更新上一条消息的时间戳
 
     # display_group_message 函数用于显示实时收到的群聊消息
@@ -380,6 +385,9 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(formatted_message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
+
         self.last_message_time = timestamp
 
     # display_group_message 函数用于显示实时收到的群聊消息
@@ -396,6 +404,8 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(formatted_message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
         self.last_message_time = timestamp
 
     # display_group_message_from_database 函数用于显示从数据库中加载的群聊消息
@@ -412,6 +422,9 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(formatted_message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
+
         self.last_message_time = timestamp  # 更新上一条消息的时间戳
 
     def keyPressEvent(self, event):
@@ -427,6 +440,9 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.append(timestamp.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.messages_area.append(message)
+        self.messages_area.ensureCursorVisible()  # 确保光标可见
+        self.scroll_to_bottom()  # 然后滚动到底部
+
         self.last_message_time_per_chat[self.current_item] = timestamp  # 更新当前聊天好友的最后消息时间戳
 
     def on_send_button_click(self):
@@ -519,11 +535,12 @@ class GUI(QtWidgets.QWidget):
         # 更新该好友的最后消息时间戳
         self.last_message_time_per_chat[friend_id] = last_time
 
-    def get_friend_id(self, friend_name):
-        for friend in self.client.all_friends:
-            if friend[1] == friend_name:
-                return friend[0]
-        return None
+    def scroll_to_bottom(self):
+        # 处理所有挂起的事件，确保文本编辑区域已更新
+        QApplication.processEvents()
+        # 然后滚动到底部
+        self.messages_area.verticalScrollBar().setValue(
+            self.messages_area.verticalScrollBar().maximum())
 
     def update_friend_list_with_latest_message(self, friend_id, latest_message, is_sender):
         # 遍历好友列表项
