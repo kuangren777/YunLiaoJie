@@ -103,18 +103,31 @@ class Database:
         """
         添加好友关系。
         """
-        self.cursor.execute(
-            "INSERT INTO friends (user_id, friend_id, status, created_at) VALUES (?, ?, 'pending', datetime('now'))",
-            (user_id, friend_id))
-        self.conn.commit()
+        try:
+            self.cursor.execute(
+                "INSERT INTO friends (user_id, friend_id, status, created_at) VALUES (?, ?, 'pending', datetime('now'))",
+                (user_id, friend_id))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f'Database: accept_friend_request {e}')
+            return False
 
     def accept_friend_request(self, user_id, friend_id):
         """
         接受好友请求。
         """
-        self.cursor.execute("UPDATE friends SET status = 'accepted' WHERE user_id = ? AND friend_id = ?",
-                            (friend_id, user_id))
-        self.conn.commit()
+        try:
+            self.cursor.execute("UPDATE friends SET status = 'accepted' WHERE user_id = ? AND friend_id = ?",
+                                (user_id, friend_id))
+            self.cursor.execute(
+                "INSERT INTO friends (user_id, friend_id, status, created_at) VALUES (?, ?, 'accepted', datetime('now'))",
+                (friend_id, user_id))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f'Database: accept_friend_request {e}')
+            return False
 
     def reject_friend_request(self, user_id, friend_id):
         """
@@ -298,6 +311,28 @@ class Database:
         except Exception as e:
             print(f"Error deleting friend: {e}")
             return False
+
+    def is_user_id_valid(self, user_id):
+        # 假设 self.conn 是数据库连接对象
+        with self.conn:
+            # 查询数据库中是否存在该 user_id
+            self.cursor.execute("SELECT EXISTS(SELECT 1 FROM users WHERE user_id = ?)", (user_id,))
+            return self.cursor.fetchone()[0]
+
+    def get_pending_friend_requests(self, user_id):
+        """
+        获取与指定用户有待处理的好友请求。
+        """
+        self.cursor.execute("""
+            SELECT user_id FROM friends
+            WHERE friend_id = ? AND status = 'pending'
+        """, (user_id,))
+
+        # 获取结果并整理成一个单一的列表
+        pending_requests = [row[0] for row in self.cursor.fetchall()]
+
+        return pending_requests
+
 
 
 # if __name__ == "__main__":

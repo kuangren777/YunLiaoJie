@@ -9,9 +9,11 @@ from utils.encryption import Encryption  # 修改导入语句
 from config import ENCRYPTION_KEY
 import sys
 from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtWidgets import QMessageBox
 from Server.database import Database
 from datetime import datetime
 import pytz
+from PyQt5.QtCore import pyqtSignal, QObject
 
 from Client.gui import GUI
 
@@ -21,6 +23,21 @@ class LoginException(Exception):
         super().__init__(message)
 
 
+class ClientSignals(QObject):
+    friendRequestResponse = pyqtSignal(str, str)
+    new_message_received = pyqtSignal(str)
+    display_error_message = pyqtSignal(str)
+    update_list_item_message_preview_when_receive = pyqtSignal(int, str, str, bool)
+    display_group_message = pyqtSignal(int, int, str, datetime)
+    display_current_group_message = pyqtSignal(int, int, str, datetime)
+    receive_friend_request = pyqtSignal(int, str, str)
+    update_list_item_message_preview = pyqtSignal(int, str, str)
+    display_message = pyqtSignal(int, str, datetime)
+    run = pyqtSignal()
+
+
+
+
 class Client:
     def __init__(self, host, port, user_info):
         self.host: str = host
@@ -28,6 +45,9 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.encryption = Encryption(key=ENCRYPTION_KEY)
         self.connected: bool = False
+
+        self.signals = ClientSignals()
+        self.signals.friendRequestResponse.connect(self.show_add_friend_response_dialog)
 
         self.app = QtWidgets.QApplication(sys.argv)  # 创建 QApplication 实例
         self.login_info: tuple = user_info
@@ -46,6 +66,20 @@ class Client:
 
         self.gui = GUI(self)  # 创建 GUI 实例
         self.chat = Chat(self)  # 创建 Chat 实例
+
+        # self.gui.signals.check_friend_requests.connect(self.check_friend_requests)
+        # self.gui.signals.send_add_friend_request.connect(self.send_add_friend_request)
+        # self.gui.signals.create_group.connect(self.create_group)
+        # self.gui.signals.get_friend_info.connect(self.get_friend_info)
+        # self.gui.signals.delete_friend.connect(self.delete_friend)
+        # self.gui.signals.get_friend_list.connect(self.get_friend_list)
+        # self.gui.signals.get_group_list.connect(self.get_group_list)
+        # self.gui.signals.get_friend_name.connect(self.get_friend_name)
+        # self.gui.signals.get_group_name.connect(self.get_group_name)
+        # self.gui.signals.send_message.connect(self.send_message)
+        # self.gui.signals.accept_friend_request.connect(self.accept_friend_request)
+        # self.gui.signals.reject_friend_request.connect(self.reject_friend_request)
+
 
     def connect_to_server(self):
         try:
@@ -83,8 +117,9 @@ class Client:
 
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
                 if '##@@##OffsiteLogin##@##' in message:
-                    self.gui.display_error_message('[OFF-LINE] Another user logged in with your user ID. You have '
-                                                   'been disconnected.')
+                    self.signals.display_error_message.emit(
+                        '[OFF-LINE] Another user logged in with your user ID. You have '
+                        'been disconnected.')
                     self.connected = False
                     raise LoginException('[OFF-LINE] Another user logged in with your user ID. You have been '
                                          'disconnected.')
@@ -99,22 +134,47 @@ class Client:
                     sender_name = self.get_friend_name(int(sender_id))
 
                     # 更新群组消息预览
-                    self.gui.update_list_item_message_preview_when_receive(int(group_id), content, sender_name,
-                                                                           is_group=True)
+                    self.signals.update_list_item_message_preview_when_receive.emit(int(group_id), content, sender_name,
+                                                                                    True)
 
                     # 检查是否是当前查看的群组
                     if self.gui.current_item == int(group_id) and self.gui.current_chat_type == 'group':
                         formatted_message = f"{content}"
-                        self.gui.display_group_message(int(group_id), int(sender_id), formatted_message,
-                                                       current_datetime)
+                        self.signals.display_group_message.emit(int(group_id), int(sender_id), formatted_message,
+                                                                current_datetime)
                     else:
                         formatted_message = f"{content}"
-                        self.gui.display_current_group_message(int(group_id), int(sender_id), formatted_message,
+                        self.signals.display_current_group_message.emit(int(group_id), int(sender_id), formatted_message,
                                                                current_datetime)
+
+                # elif message_type == 'friend_request':
+                #     # 假设消息格式是：friend_request#$#<user_id>#$#<friend_id>
+                #     user_id, friend_id = content.split('#$#')
+                #     self.gui.receive_friend_request(user_id, friend_id)
+
+                elif message_type == 'add_friend_response':
+                    """
+                    请求成功: add_friend_response#$#success#$#{friend_user_id}
+                    请求失败: add_friend_response#$#fail#$#{friend_user_id}
+                    好友 user_id 无效: add_friend_response#$#error#{friend_user_id}
+                    """
+                    response_type, friend_user_id = sender, content
+                    self.signals.friendRequestResponse.emit(response_type, friend_user_id)
+                    print(f'Receive server friend request reply: {message}')
+
+                elif message_type == 'check_requester_response':
+                    print(f'Getting a response from the server to check for friends: {message}')
+                    requester_id, requester_username = sender, content
+                    # print(type(self.user_id), self.user_id)
+                    # print(type(requester_id), requester_id)
+                    # print(type(requester_username), requester_username)
+
+                    self.signals.receive_friend_request.emit(self.user_id, requester_id, requester_username)
+
                 else:
                     sender_name = self.get_friend_name(int(sender))
                     # 更新好友消息预览
-                    self.gui.update_list_item_message_preview(int(sender), content, sender_name)
+                    self.signals.update_list_item_message_preview.emit(int(sender), content, sender_name)
 
                     sender_name = "你" if sender == self.user_id else sender_name
 
@@ -122,11 +182,11 @@ class Client:
                     if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
 
                         formatted_message = f"{sender_name}: {content}"
-                        self.gui.display_message(int(sender), formatted_message, current_datetime)
+                        self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
 
                     else:
                         formatted_message = f"<b>{sender_name}: {content}</b>"
-                        self.gui.display_message(int(sender), formatted_message, current_datetime)
+                        self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break
@@ -134,11 +194,58 @@ class Client:
     def start(self):
         if self.connect_to_server():
             threading.Thread(target=self.receive_messages, daemon=True).start()
-            self.gui.run()
+            self.signals.run.emit()
             sys.exit(self.app.exec_())  # 启动事件循环
 
-    def on_send_button_click(self, message: str):
-        self.send_message(message)
+    def show_add_friend_response_dialog(self, response_type, friend_user_id):
+        """
+        显示添加好友请求的响应提示。
+        """
+        if response_type == 'success':
+            message = f"成功申请添加用户 {friend_user_id} 为好友。"
+            QMessageBox.information(None, "添加好友", message)
+        elif response_type == 'fail':
+            message = f"无法申请添加用户 {friend_user_id} 为好友。"
+            QMessageBox.warning(None, "添加好友", message)
+        elif response_type == 'error':
+            message = f"用户 ID {friend_user_id} 无效，无法添加为好友。"
+            QMessageBox.critical(None, "添加好友", message)
+
+    # def send_friend_request(self, friend_id):
+    #     """
+    #     发送好友请求到服务器。
+    #     """
+    #     request_message = f'friend_request#$#{friend_id}'
+    #     encrypted_request = self.encryption.encrypt(request_message)
+    #     self.socket.sendall(encrypted_request)
+
+    # def handle_friend_request_response(self, response):
+    #     """
+    #     处理服务器返回的好友请求响应。
+    #     """
+    #     # 假设响应格式为: 'friend_request_response#$#<result>'
+    #     result = response.split('#$#')[1]
+    #     if result == 'success':
+    #         print("好友请求发送成功。")
+    #     else:
+    #         print("好友请求发送失败。")
+
+    def accept_friend_request(self, requester_id):
+        """
+        接受好友请求。
+        """
+        accept_message = f'accept_friend_request#$#{requester_id}#$#{self.user_id}'
+        encrypted_accept = self.encryption.encrypt(accept_message)
+        self.socket.sendall(encrypted_accept)
+
+    def reject_friend_request(self, requester_id):
+        """
+        拒绝好友请求。
+        """
+
+        reject_message = f'reject_friend_request#$#{requester_id}'
+        encrypted_reject = self.encryption.encrypt(reject_message)
+        self.socket.sendall(encrypted_reject)
 
     def get_friend_list(self):
         return self.database.get_friends_user_info(self.user_id)
@@ -165,6 +272,28 @@ class Client:
         else:
             print(f"无法删除好友 {friend_id}。")
             return False
+
+    def create_group(self, selected_friends):
+        # TODO: 发送创建群聊请求到服务器的逻辑
+        pass
+
+    def send_add_friend_request(self, friend_user_id):
+        # 发送添加朋友请求到服务器的逻辑
+        if self.connected:
+            try:
+                # 构造请求消息
+                request_message = f'friend_request#$#{self.user_id}#$#{friend_user_id}'
+                encrypted_request = self.encryption.encrypt(request_message)
+                self.socket.sendall(encrypted_request)
+                print(f'Sends an add request to the server:{request_message}')
+            except Exception as e:
+                print(f"Failed to send add friend request: {e}")
+
+    def check_friend_requests(self):
+        # 向服务器发送请求检查好友请求的消息
+        request_message = f"check_requester_requests#$#{self.user_id}#$#_"
+        self.socket.send(self.encryption.encrypt(request_message.encode('utf-8')))
+        print(f'Sends a check friend request to the server: {request_message}')
 
 
 class Chat:

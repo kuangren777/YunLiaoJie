@@ -4,15 +4,19 @@
 # @File    : gui.py
 # @Tags    :
 from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QObject
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import QApplication
+
+from Client.Dialog.CreateGroupDialog import CreateGroupDialog
+from Client.Dialog.AddFriendDialog import AddFriendDialog
+
 import pytz
-import threading
 
 
 class GUI(QtWidgets.QWidget):
     display_friend_info_signal = pyqtSignal(dict)
+    friend_request_received = pyqtSignal(str, str, str)  # user_id, requester_id, requester_username
 
     def __init__(self, client):
         super().__init__()
@@ -26,6 +30,16 @@ class GUI(QtWidgets.QWidget):
 
         # 将信号连接到槽函数
         self.display_friend_info_signal.connect(self.show_friend_info)
+        self.friend_request_received.connect(self.handle_friend_request_received)
+        self.client.signals.display_error_message.connect(self.display_error_message)
+        self.client.signals.update_list_item_message_preview_when_receive.connect(
+            self.update_list_item_message_preview_when_receive)
+        self.client.signals.display_group_message.connect(self.display_group_message)
+        self.client.signals.display_current_group_message.connect(self.display_current_group_message)
+        self.client.signals.receive_friend_request.connect(self.receive_friend_request)
+        self.client.signals.update_list_item_message_preview.connect(self.update_list_item_message_preview)
+        self.client.signals.display_message.connect(self.display_message)
+        self.client.signals.run.connect(self.run)
 
     def init_ui(self):
         # 假设 client 对象有一个 username 属性
@@ -44,9 +58,14 @@ class GUI(QtWidgets.QWidget):
         top_layout = QtWidgets.QHBoxLayout()
 
         # 添加朋友按钮
-        self.add_friend_button = QtWidgets.QPushButton("添加朋友")
+        self.add_friend_button = QtWidgets.QPushButton("添加好友")
         self.add_friend_button.clicked.connect(self.on_add_friend_button_click)  # 需要定义该方法
         top_layout.addWidget(self.add_friend_button)
+
+        # 好友验证
+        self.friend_request = QtWidgets.QPushButton("好友验证")
+        self.friend_request.clicked.connect(self.on_friend_request_button_click)  # 需要定义该方法
+        top_layout.addWidget(self.friend_request)
 
         # 发起群聊按钮
         self.create_group_button = QtWidgets.QPushButton("发起群聊")
@@ -139,20 +158,33 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
-    # 发送文件按钮点击事件处理函数
     def on_send_file_button_click(self):
-        # 此处添加处理发送文件的逻辑
+        # TODO: 文件发送按钮
         pass
 
-    # 添加朋友按钮点击事件处理函数
+    def handle_friend_request_received(self, user_id, requester_id, requester_username):
+        self.receive_friend_request(user_id, requester_id, requester_username)
+
+    # 处理好友请求按钮点击事件
+    def on_friend_request_button_click(self):
+        self.client.check_friend_requests()
+
+        self.load_friends_and_groups()  # 刷新好友列表
+
+    # 处理添加好友按钮点击事件
     def on_add_friend_button_click(self):
-        # 此处添加处理添加朋友的逻辑
-        pass
+        add_friend_dialog = AddFriendDialog(self)
+        if add_friend_dialog.exec_() == QtWidgets.QDialog.Accepted:
+            user_id_to_add = add_friend_dialog.get_user_id()
+            self.client.send_add_friend_request(user_id_to_add)
 
     # 发起群聊按钮点击事件处理函数
     def on_create_group_button_click(self):
-        # 此处添加处理发起群聊的逻辑
-        pass
+        dialog = CreateGroupDialog(self.client.all_friends, self)
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            selected_friends = dialog.get_selected_friends()
+            # 这里需要实现发送创建群聊请求的逻辑
+            self.client.create_group(selected_friends)
 
     def on_friend_info_button_click(self):
         # 显示选中的好友信息
@@ -205,6 +237,10 @@ class GUI(QtWidgets.QWidget):
                 if self.client.delete_friend(friend_id):
                     QtWidgets.QMessageBox.information(self, "删除成功", "好友已经被成功删除。")
                     self.load_friends_and_groups()  # 刷新好友列表
+
+                    self.friend_info_button.setVisible(False)
+                    self.delete_friend_button.setVisible(False)
+                    self.send_file_button.setVisible(False)
                 else:
                     QtWidgets.QMessageBox.warning(self, "删除失败", "无法删除该好友。")
         else:
@@ -240,18 +276,21 @@ class GUI(QtWidgets.QWidget):
             friend_id, friend_name = item[0], item[1]
             latest_message, sender_id = self.client.database.get_latest_message_with_sender(self.client.user_id,
                                                                                             friend_id)
-            prefix = "你:" if int(sender_id) == self.client.user_id else "对方:"
-            latest_message = f"{prefix}{latest_message[:5]}..." if len(
-                latest_message) > 5 else f"{prefix}{latest_message}"
+            if latest_message and sender_id:
+                prefix = "你:" if int(sender_id) == self.client.user_id else "对方:"
+                latest_message = f"{prefix}{latest_message[:5]}..." if len(
+                    latest_message) > 5 else f"{prefix}{latest_message}"
             label_text = friend_name
             name_object_name = f"name_label_{friend_id}"
             message_object_name = f"message_label_{friend_id}"
         else:
             group_id, group_name = item[0], item[1]
             latest_message, sender_name = self.client.database.get_latest_group_message_with_sender(group_id)
-            sender_prefix = '你' if self.client.username == sender_name else sender_name
-            latest_message = f"{sender_prefix}: {latest_message[:5]}..." if len(
-                latest_message) > 5 else f"{sender_prefix}: {latest_message}"
+
+            if latest_message and sender_name:
+                sender_prefix = '你' if self.client.username == sender_name else sender_name
+                latest_message = f"{sender_prefix}: {latest_message[:5]}..." if len(
+                    latest_message) > 5 else f"{sender_prefix}: {latest_message}"
             label_text = group_name
             name_object_name = f"group_label_{group_id}"
             message_object_name = f"group_message_label_{group_id}"
@@ -595,6 +634,29 @@ class GUI(QtWidgets.QWidget):
 
     def run(self):
         self.show()
+
+    def receive_friend_request(self, user_id, requester_id, requester_username):
+        # 创建一个对话框来显示请求信息，并提供接受和拒绝按钮
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setIcon(QtWidgets.QMessageBox.Question)
+        msg_box.setWindowTitle("好友请求")
+        msg_box.setText(f"用户 {requester_username} 想要添加您为好友。")
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
+        # # 连接按钮的信号与相应的槽
+        # result = msg_box.exec_()
+        # if result == QtWidgets.QMessageBox.Yes:
+        #     self.respond_to_friend_request(requester_id, True)
+        # elif result == QtWidgets.QMessageBox.No:
+        #     self.respond_to_friend_request(requester_id, False)
+        result = msg_box.exec_()
+        self.respond_to_friend_request(requester_id, result == QtWidgets.QMessageBox.Yes)
+
+    def respond_to_friend_request(self, requester_id, accept):
+        if accept:
+            self.client.accept_friend_request(requester_id)
+        else:
+            self.client.reject_friend_request(requester_id)
 
 
 if __name__ == "__main__":

@@ -41,6 +41,7 @@ class Server:
                 encrypted_message = client_socket.recv(1024)
                 if not encrypted_message:
                     break
+                print(f'Raw message: {encrypted_message}')
                 message = self.encryption.decrypt(encrypted_message).decode('utf-8')
 
                 print(f"Received message from {address}: {message}")
@@ -71,10 +72,58 @@ class Server:
                         """
                         self.handle_group_message(client_socket, recipient, content)
 
+                    elif message_type == 'friend_request':
+                        """
+                        添加好友消息，格式：friend_request#$#<user_id>#$#<friend_id>
+                        """
+                        print(f'Receives client sending add request:{message}')
+                        # 解析出用户ID和朋友的用户名
+                        user_id, friend_id = recipient, content
+                        # 调用处理添加朋友请求的方法
+                        self.process_add_friend_request(user_id, friend_id, client_socket)
+
+                    # 处理接受和拒绝好友请求的逻辑
+                    elif message_type == 'accept_friend_request':
+                        """
+                        同意好友请求，格式：accept_friend_request#$#<user_id>#$#<friend_id>
+                        """
+                        print(f'Receives a friend request acceptance from the client: {message}')
+                        user_id, friend_id = recipient, content
+
+                        self.database.accept_friend_request(user_id, friend_id)
+
+                    elif message_type == 'reject_friend_request':
+                        """
+                        同意好友请求，格式：reject_friend_request#$#<user_id>#$#<friend_id>
+                        """
+                        print(f'Receive a friend request rejection from the client: {message}')
+
+                        user_id, friend_id = recipient, content
+
+                        self.database.accept_friend_request(user_id, friend_id)
+
+                    elif message_type == 'check_requester_requests':
+                        """
+                        同意好友请求，格式：check_requester_requests#$#<user_id>#$#_
+                        """
+                        print(f'Receive a friend request check from the client: {message}')
+
+                        user_id, _ = recipient, content
+
+                        pending_requests = self.database.get_pending_friend_requests(user_id)
+
+                        for requester_id in pending_requests:
+                            requester_username = self.database.get_user_info_by_id(requester_id)['用户名']
+                            message = f'check_requester_response#$#{requester_id}#$#{requester_username}'
+                            client_socket.sendall(self.encryption.encrypt(message.encode('utf-8')))
+                            print(f'check_requester_response: {message}')
+
                     else:
                         """
                         个人消息，格式：private#$#<receiver_id>#$#<content>
                         """
+                        print(f'Receive a private message from the client: {message}')
+
                         sender_id = self.current_online_address_to_id[address]
                         receiver_id = recipient
                         content = content
@@ -89,6 +138,7 @@ class Server:
 
                             print(f'[info] Send message to client # sender_id:{sender_id},'
                                   f'receiver_id:{receiver_id}, message:{message}.', end='')
+
                             self.send_message_to_client(
                                 sender_id=sender_id,
                                 receiver_id=receiver_id,
@@ -101,6 +151,26 @@ class Server:
 
         client_socket.close()
         self.remove_client(address)
+
+    def process_add_friend_request(self, user_id, friend_user_id, client_socket):
+        # 直接检查 user_id 是否有效
+        if self.database.is_user_id_valid(friend_user_id):
+            # 添加好友关系到数据库
+            if self.database.add_friend(user_id, friend_user_id):
+                # 通知客户端添加成功
+                success_message = f'add_friend_response#$#success#$#{friend_user_id}'
+                client_socket.sendall(self.encryption.encrypt(success_message.encode('utf-8')))
+                print(f'Notify the client that the request was sent successfully:{success_message}')
+            else:
+                # 通知客户端添加失败
+                fail_message = f'add_friend_response#$#fail#$#{friend_user_id}'
+                client_socket.sendall(self.encryption.encrypt(fail_message.encode('utf-8')))
+                print(f'Notify the client that the request was sent fail:{fail_message}')
+        else:
+            # 好友 user_id 无效，通知客户端错误
+            error_message = f'add_friend_response#$#error#{friend_user_id}'
+            client_socket.sendall(self.encryption.encrypt(error_message.encode('utf-8')))
+            print(f'Notify the client that the request was sent error:{error_message}')
 
     def notify_disconnection(self, client_socket):
         """
