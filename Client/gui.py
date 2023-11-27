@@ -112,10 +112,10 @@ class GUI(QtWidgets.QWidget):
         self.friend_info_button.clicked.connect(self.on_friend_info_button_click)  # 需要定义该方法
         self.friend_actions_layout.addWidget(self.friend_info_button, 1)
 
-        # 在当前聊天好友的名称标签下添加发送文件按钮
-        self.send_file_button = QtWidgets.QPushButton("发送文件")
-        self.send_file_button.clicked.connect(self.on_send_file_button_click)  # 需要定义该方法
-        self.friend_actions_layout.addWidget(self.send_file_button, 1)
+        # # 在当前聊天好友的名称标签下添加发送文件按钮
+        # self.send_file_button = QtWidgets.QPushButton("发送文件")
+        # self.send_file_button.clicked.connect(self.on_send_file_button_click)  # 需要定义该方法
+        # self.friend_actions_layout.addWidget(self.send_file_button, 1)
 
         # 删除好友按钮
         self.delete_friend_button = QtWidgets.QPushButton("删除好友")
@@ -142,7 +142,7 @@ class GUI(QtWidgets.QWidget):
         # 只有在选中好友时，按钮才可见
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
-        self.send_file_button.setVisible(False)
+        # self.send_file_button.setVisible(False)
 
         self.group_info_button.setVisible(False)
         self.delete_group_button.setVisible(False)
@@ -270,9 +270,8 @@ class GUI(QtWidgets.QWidget):
         else:
             QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个群聊。")
 
-    def on_send_file_button_click(self):
-        # TODO: 文件发送按钮
-        pass
+    # def on_send_file_button_click(self):
+    #     pass
 
     def handle_friend_request_received(self, user_id, requester_id, requester_username):
         self.receive_friend_request(user_id, requester_id, requester_username)
@@ -379,7 +378,7 @@ class GUI(QtWidgets.QWidget):
 
                     self.friend_info_button.setVisible(False)
                     self.delete_friend_button.setVisible(False)
-                    self.send_file_button.setVisible(False)
+                    # self.send_file_button.setVisible(False)
                 else:
                     QtWidgets.QMessageBox.warning(self, "删除失败", "无法删除该好友。")
         else:
@@ -412,7 +411,7 @@ class GUI(QtWidgets.QWidget):
 
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
-        self.send_file_button.setVisible(False)
+        # self.send_file_button.setVisible(False)
 
         self.group_info_button.setVisible(False)
         self.delete_group_button.setVisible(False)
@@ -496,7 +495,7 @@ class GUI(QtWidgets.QWidget):
 
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
-        self.send_file_button.setVisible(False)
+        # self.send_file_button.setVisible(False)
 
         self.group_info_button.setVisible(True)
         self.delete_group_button.setVisible(True)
@@ -531,7 +530,7 @@ class GUI(QtWidgets.QWidget):
 
         self.friend_info_button.setVisible(True)
         self.delete_friend_button.setVisible(True)
-        self.send_file_button.setVisible(True)
+        # self.send_file_button.setVisible(True)
 
         self.group_info_button.setVisible(False)
         self.delete_group_button.setVisible(False)
