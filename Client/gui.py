@@ -16,6 +16,7 @@ import pytz
 
 class GUI(QtWidgets.QWidget):
     display_friend_info_signal = pyqtSignal(dict)
+    display_group_info_signal = pyqtSignal(dict)
     friend_request_received = pyqtSignal(str, str, str)  # user_id, requester_id, requester_username
 
     def __init__(self, client):
@@ -30,6 +31,7 @@ class GUI(QtWidgets.QWidget):
 
         # 将信号连接到槽函数
         self.display_friend_info_signal.connect(self.show_friend_info)
+        self.display_group_info_signal.connect(self.show_group_info)
         self.friend_request_received.connect(self.handle_friend_request_received)
         self.client.signals.display_error_message.connect(self.display_error_message)
         self.client.signals.update_list_item_message_preview_when_receive.connect(
@@ -99,6 +101,7 @@ class GUI(QtWidgets.QWidget):
 
         # 添加好友操作按钮
         self.friend_actions_layout = QtWidgets.QHBoxLayout()
+        self.group_actions_layout = QtWidgets.QHBoxLayout()
 
         # 好友信息按钮
         self.friend_info_button = QtWidgets.QPushButton("好友信息")
@@ -116,12 +119,33 @@ class GUI(QtWidgets.QWidget):
         self.delete_friend_button.setStyleSheet("QPushButton { color: red; }")  # 设置文本颜色为红色
         self.friend_actions_layout.addWidget(self.delete_friend_button, 1)
 
+        # 群聊信息按钮
+        self.group_info_button = QtWidgets.QPushButton("群聊信息")
+        self.group_info_button.clicked.connect(self.on_group_info_button_click)  # 需要定义该方法
+        self.group_actions_layout.addWidget(self.group_info_button, 1)
+
+        # 群聊信息按钮
+        self.add_group_member_button = QtWidgets.QPushButton("添加成员")
+        self.add_group_member_button.clicked.connect(self.on_add_group_member_button_click)  # 需要定义该方法
+        self.group_actions_layout.addWidget(self.add_group_member_button, 1)
+
+        # 退出群聊按钮
+        self.delete_group_button = QtWidgets.QPushButton("退出群聊")
+        self.delete_group_button.clicked.connect(self.on_delete_group_button_click)  # 需要定义该方法
+        self.delete_group_button.setStyleSheet("QPushButton { color: red; }")  # 设置文本颜色为红色
+        self.group_actions_layout.addWidget(self.delete_group_button, 1)
+
         # 只有在选中好友时，按钮才可见
         self.friend_info_button.setVisible(False)
         self.delete_friend_button.setVisible(False)
         self.send_file_button.setVisible(False)
 
+        self.group_info_button.setVisible(False)
+        self.delete_group_button.setVisible(False)
+        self.add_group_member_button.setVisible(False)
+
         right_layout.addLayout(self.friend_actions_layout)
+        right_layout.addLayout(self.group_actions_layout)
 
         # 消息显示区域
         self.messages_area = QtWidgets.QTextEdit()
@@ -157,6 +181,40 @@ class GUI(QtWidgets.QWidget):
 
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
+
+    def on_add_group_member_button_click(self):
+        # TODO: 邀请好友
+        pass
+
+    def on_delete_group_button_click(self):
+        # TODO: 删除群聊
+        pass
+
+    def on_group_info_button_click(self):
+        # 检查当前是否选择了群聊
+        if self.current_chat_type == 'group' and self.current_item is not None:
+            # 获取群聊信息
+            self.client.get_group_info(self.current_item)
+            # if group_info:
+            #     # 创建对话框显示群聊信息
+            #     dialog = QtWidgets.QDialog(self)
+            #     dialog.setWindowTitle("群聊信息")
+            #     layout = QtWidgets.QVBoxLayout(dialog)
+            #
+            #     # 显示群聊的各项信息
+            #     for key, value in group_info.items():
+            #         layout.addWidget(QtWidgets.QLabel(f"{key}: {value}"))
+            #
+            #     dialog.setLayout(layout)
+            #     dialog.exec_()
+            # else:
+            #     QtWidgets.QMessageBox.warning(self, "错误", "无法获取群聊信息。")
+        else:
+            QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个群聊。")
+
+    def delete_group_button(self):
+        # TODO: 退出群聊按钮
+        pass
 
     def on_send_file_button_click(self):
         # TODO: 文件发送按钮
@@ -195,6 +253,33 @@ class GUI(QtWidgets.QWidget):
             self.show_friend_info(friend_info)
         else:
             QtWidgets.QMessageBox.warning(self, "提示", "请先选择一个好友")
+
+    @QtCore.pyqtSlot(dict)
+    def show_group_info(self, group_info: dict):
+        # 如果已经存在一个信息对话框，先关闭它
+        if self.info_dialog is not None:
+            self.info_dialog.close()
+            self.info_dialog = None
+
+        if group_info:
+            # 创建对话框显示群聊信息
+            self.info_dialog = QtWidgets.QDialog(self)
+            self.info_dialog.setWindowTitle("群聊信息")
+            self.info_dialog.setWindowModality(QtCore.Qt.NonModal)  # 设置为非模态
+
+            # 设置对话框大小
+            self.info_dialog.resize(400, 200)  # 设置为400x300的大小
+
+            # 设置对话框布局
+            layout = QtWidgets.QVBoxLayout()
+
+            # 显示群聊的各项信息
+            for key, value in group_info.items():
+                layout.addWidget(QtWidgets.QLabel(f"{key}: {value}"))
+
+            self.info_dialog.setLayout(layout)
+            self.info_dialog.finished.connect(self.on_info_dialog_closed)  # 连接对话框关闭信号
+            self.info_dialog.show()  # 非模态显示对话框
 
     # 将 show_friend_info 调整为接收信号
     @QtCore.pyqtSlot(dict)
@@ -264,7 +349,7 @@ class GUI(QtWidgets.QWidget):
         for group in self.client.all_groups:
             self.add_list_item(group, is_friend=False)
 
-        # 可能还需要更新当前选中的项目或清除消息区域等
+        # 更新当前选中的项目或清除消息区域等
         self.current_item = None
         if hasattr(self, 'messages_area'):
             self.messages_area.clear()
@@ -351,6 +436,11 @@ class GUI(QtWidgets.QWidget):
         self.delete_friend_button.setVisible(False)
         self.send_file_button.setVisible(False)
 
+        self.group_info_button.setVisible(True)
+        self.delete_group_button.setVisible(True)
+        self.add_group_member_button.setVisible(True)
+
+
     def get_group_id(self, group_name):
         for group in self.client.all_groups:
             if group[1] == group_name:
@@ -380,6 +470,10 @@ class GUI(QtWidgets.QWidget):
         self.friend_info_button.setVisible(True)
         self.delete_friend_button.setVisible(True)
         self.send_file_button.setVisible(True)
+
+        self.group_info_button.setVisible(False)
+        self.delete_group_button.setVisible(False)
+        self.add_group_member_button.setVisible(False)
 
     def get_friend_id(self, friend_name):
         for friend in self.client.all_friends:

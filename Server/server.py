@@ -64,55 +64,18 @@ class Server:
 
                 else:
 
-
                     parameter = message.split('#$#')
+                    print(parameter)
+                    message_type = parameter[0]
 
-                    if len(parameter) == 3:
-                        message_type, recipient, content = message.split('#$#')
-
-                        if message_type == 'group':
-                            """
-                            群组消息，格式：group#$#<group_id>#$#<message_content>
-                            """
-                            self.handle_group_message(client_socket, recipient, content)
-
-                        elif message_type == 'friend_request':
-                            """
-                            添加好友消息，格式：friend_request#$#<user_id>#$#<friend_id>
-                            """
-                            print(f'Receives client sending add request:{message}')
-                            # 解析出用户ID和朋友的用户名
-                            user_id, friend_id = recipient, content
-                            # 调用处理添加朋友请求的方法
-                            self.process_add_friend_request(user_id, friend_id, client_socket)
-
-                        # 处理接受和拒绝好友请求的逻辑
-                        elif message_type == 'accept_friend_request':
-                            """
-                            同意好友请求，格式：accept_friend_request#$#<user_id>#$#<friend_id>
-                            """
-                            print(f'Receives a friend request acceptance from the client: {message}')
-                            user_id, friend_id = recipient, content
-
-                            self.database.accept_friend_request(user_id, friend_id)
-
-                        elif message_type == 'reject_friend_request':
-                            """
-                            同意好友请求，格式：reject_friend_request#$#<user_id>#$#<friend_id>
-                            """
-                            print(f'Receive a friend request rejection from the client: {message}')
-
-                            user_id, friend_id = recipient, content
-
-                            self.database.accept_friend_request(user_id, friend_id)
-
-                        elif message_type == 'check_requester_requests':
+                    if len(parameter) == 2:
+                        if message_type == 'check_requester_requests':
                             """
                             同意好友请求，格式：check_requester_requests#$#<user_id>#$#_
                             """
                             print(f'Receive a friend request check from the client: {message}')
 
-                            user_id, _ = recipient, content
+                            user_id = parameter[1]
 
                             pending_requests = self.database.get_pending_friend_requests(user_id)
 
@@ -122,7 +85,59 @@ class Server:
                                 client_socket.sendall(self.encryption.encrypt(message.encode('utf-8')))
                                 print(f'check_requester_response: {message}')
 
+                        elif message_type == 'get_group_info':
+                            group_id = parameter[1]
+                            print(group_id)
+                            group_info = self.get_group_info(group_id)
+                            response_message = f'group_info_response#$#{group_info}'
+                            print(f'group_info_response: {response_message}')
+                            encrypted_response = self.encryption.encrypt(response_message.encode('utf-8'))
+                            client_socket.sendall(encrypted_response)
+
+                    elif len(parameter) == 3:
+                        message_type, recipient, content = message.split('#$#')
+
+                        if message_type == 'group':
+                            """
+                            群组消息，格式：group#$#<group_id>#$#<message_content>
+                            """
+                            print(f'Receives client message:{message}')
+                            group_id, message_content = parameter[1], parameter[2]
+                            self.handle_group_message(client_socket, group_id, message_content)
+
+                        elif message_type == 'friend_request':
+                            """
+                            添加好友消息，格式：friend_request#$#<user_id>#$#<friend_id>
+                            """
+                            print(f'Receives client sending add request:{message}')
+                            # 解析出用户ID和朋友的用户名
+                            user_id, friend_id = parameter[1], parameter[2]
+
+                            # 调用处理添加朋友请求的方法
+                            self.process_add_friend_request(user_id, friend_id, client_socket)
+
+                        # 处理接受和拒绝好友请求的逻辑
+                        elif message_type == 'accept_friend_request':
+                            """
+                            同意好友请求，格式：accept_friend_request#$#<user_id>#$#<friend_id>
+                            """
+                            print(f'Receives a friend request acceptance from the client: {message}')
+                            user_id, friend_id = parameter[1], parameter[2]
+
+                            self.database.accept_friend_request(user_id, friend_id)
+
+                        elif message_type == 'reject_friend_request':
+                            """
+                            同意好友请求，格式：reject_friend_request#$#<user_id>#$#<friend_id>
+                            """
+                            print(f'Receive a friend request rejection from the client: {message}')
+
+                            user_id, friend_id = parameter[1], parameter[2]
+
+                            self.database.accept_friend_request(user_id, friend_id)
+
                         else:
+
                             """
                             个人消息，格式：private#$#<receiver_id>#$#<content>
                             """
@@ -152,8 +167,6 @@ class Server:
 
                     elif len(parameter) == 4:
 
-                        message_type = parameter[0]
-
                         if message_type == 'create_group':
                             user_id, group_name, friends_names_str = parameter[1], parameter[2], parameter[3]
                             print(f'userid:{user_id}, group_name:{group_name}, friends_name:{friends_names_str}')
@@ -165,6 +178,11 @@ class Server:
 
         client_socket.close()
         self.remove_client(address)
+
+    def get_group_info(self, group_id):
+        # 从数据库中获取群聊信息
+        # 假设这个方法返回一个包含群聊信息的字典
+        return self.database.get_group_info_include_members(group_id)
 
     def create_group(self, user_id, group_name, friends_names):
         """

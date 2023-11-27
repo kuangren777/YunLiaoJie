@@ -7,7 +7,7 @@ import socket
 import threading
 from utils.encryption import Encryption  # 修改导入语句
 from config import ENCRYPTION_KEY
-import sys
+import sys, ast
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QMessageBox
 from Server.database import Database
@@ -140,70 +140,83 @@ class Client:
                     raise LoginException('[OFF-LINE] Another user logged in with your user ID. You have been '
                                          'disconnected.')
 
-                message_type, sender, content = message.split('#$#')
-
                 current_datetime = datetime.now(pytz.timezone('Asia/Shanghai'))
 
-                if message_type == 'group':
-                    group_id, sender_id = sender.split('###')
-                    group_name = self.get_group_name(int(group_id))
-                    sender_name = self.get_friend_name(int(sender_id))
+                parameter = message.split('#$#')
+                message_type = parameter[0]
 
-                    # 更新群组消息预览
-                    self.signals.update_list_item_message_preview_when_receive.emit(int(group_id), content, sender_name,
-                                                                                    True)
+                if len(parameter) == 2:
 
-                    # 检查是否是当前查看的群组
-                    if self.gui.current_item == int(group_id) and self.gui.current_chat_type == 'group':
-                        formatted_message = f"{content}"
-                        self.signals.display_group_message.emit(int(group_id), int(sender_id), formatted_message,
-                                                                current_datetime)
+                    if message_type == 'group_info_response':
+                        group_info = parameter[1]
+                        group_info = ast.literal_eval(group_info)
+                        self.gui.display_group_info_signal.emit(group_info)
+
+                elif len(parameter) == 3:
+
+                    if message_type == 'group':
+                        sender, content = parameter[1], parameter[2]
+                        group_id, sender_id = sender.split('###')
+                        group_name = self.get_group_name(int(group_id))
+                        sender_name = self.get_friend_name(int(sender_id))
+
+                        # 更新群组消息预览
+                        self.signals.update_list_item_message_preview_when_receive.emit(int(group_id), content, sender_name,
+                                                                                        True)
+
+                        # 检查是否是当前查看的群组
+                        if self.gui.current_item == int(group_id) and self.gui.current_chat_type == 'group':
+                            formatted_message = f"{content}"
+                            self.signals.display_group_message.emit(int(group_id), int(sender_id), formatted_message,
+                                                                    current_datetime)
+                        else:
+                            formatted_message = f"{content}"
+                            self.signals.display_current_group_message.emit(int(group_id), int(sender_id),
+                                                                            formatted_message,
+                                                                            current_datetime)
+
+                    # elif message_type == 'friend_request':
+                    #     # 假设消息格式是：friend_request#$#<user_id>#$#<friend_id>
+                    #     user_id, friend_id = content.split('#$#')
+                    #     self.gui.receive_friend_request(user_id, friend_id)
+
+                    elif message_type == 'add_friend_response':
+                        """
+                        请求成功: add_friend_response#$#success#$#{friend_user_id}
+                        请求失败: add_friend_response#$#fail#$#{friend_user_id}
+                        好友 user_id 无效: add_friend_response#$#error#{friend_user_id}
+                        """
+                        response_type, friend_user_id = parameter[1], parameter[2]
+                        self.signals.friendRequestResponse.emit(response_type, friend_user_id)
+                        print(f'Receive server friend request reply: {message}')
+
+                    elif message_type == 'check_requester_response':
+                        print(f'Getting a response from the server to check for friends: {message}')
+                        requester_id, requester_username = parameter[1], parameter[2]
+                        # print(type(self.user_id), self.user_id)
+                        # print(type(requester_id), requester_id)
+                        # print(type(requester_username), requester_username)
+
+                        self.signals.receive_friend_request.emit(self.user_id, requester_id, requester_username)
+
                     else:
-                        formatted_message = f"{content}"
-                        self.signals.display_current_group_message.emit(int(group_id), int(sender_id),
-                                                                        formatted_message,
-                                                                        current_datetime)
+                        sender, content = parameter[1], parameter[2]
+                        sender_name = self.get_friend_name(int(sender))
+                        # 更新好友消息预览
+                        self.signals.update_list_item_message_preview.emit(int(sender), content, sender_name)
 
-                # elif message_type == 'friend_request':
-                #     # 假设消息格式是：friend_request#$#<user_id>#$#<friend_id>
-                #     user_id, friend_id = content.split('#$#')
-                #     self.gui.receive_friend_request(user_id, friend_id)
+                        sender_name = "你" if sender == self.user_id else sender_name
 
-                elif message_type == 'add_friend_response':
-                    """
-                    请求成功: add_friend_response#$#success#$#{friend_user_id}
-                    请求失败: add_friend_response#$#fail#$#{friend_user_id}
-                    好友 user_id 无效: add_friend_response#$#error#{friend_user_id}
-                    """
-                    response_type, friend_user_id = sender, content
-                    self.signals.friendRequestResponse.emit(response_type, friend_user_id)
-                    print(f'Receive server friend request reply: {message}')
+                        # 检查是否是当前查看的好友
+                        if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
 
-                elif message_type == 'check_requester_response':
-                    print(f'Getting a response from the server to check for friends: {message}')
-                    requester_id, requester_username = sender, content
-                    # print(type(self.user_id), self.user_id)
-                    # print(type(requester_id), requester_id)
-                    # print(type(requester_username), requester_username)
+                            formatted_message = f"{sender_name}: {content}"
+                            self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
 
-                    self.signals.receive_friend_request.emit(self.user_id, requester_id, requester_username)
+                        else:
+                            formatted_message = f"<b>{sender_name}: {content}</b>"
+                            self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
 
-                else:
-                    sender_name = self.get_friend_name(int(sender))
-                    # 更新好友消息预览
-                    self.signals.update_list_item_message_preview.emit(int(sender), content, sender_name)
-
-                    sender_name = "你" if sender == self.user_id else sender_name
-
-                    # 检查是否是当前查看的好友
-                    if self.gui.current_item == int(sender) and self.gui.current_chat_type == 'friend':
-
-                        formatted_message = f"{sender_name}: {content}"
-                        self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
-
-                    else:
-                        formatted_message = f"<b>{sender_name}: {content}</b>"
-                        self.signals.display_message.emit(int(sender), formatted_message, current_datetime)
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 break
@@ -213,6 +226,22 @@ class Client:
             threading.Thread(target=self.receive_messages, daemon=True).start()
             self.signals.run.emit()
             sys.exit(self.app.exec_())  # 启动事件循环
+
+    def get_group_info(self, group_id):
+        # 向服务器发送获取群聊信息的请求
+        request_message = f'get_group_info#$#{group_id}'
+        encrypted_request = self.encryption.encrypt(request_message.encode('utf-8'))
+        self.socket.sendall(encrypted_request)
+
+        # # 等待并处理服务器返回的响应
+        # encrypted_response = self.socket.recv(1024)
+        # response_message = self.encryption.decrypt(encrypted_response).decode('utf-8')
+        # if response_message.startswith('group_info_response'):
+        #     _, group_info = response_message.split('#$#', 1)
+        #     return eval(group_info)  # 将字符串转换为字典
+        # else:
+        #     print("Failed to get group info")
+        #     return None
 
     def show_add_friend_response_dialog(self, response_type, friend_user_id):
         """
@@ -304,7 +333,7 @@ class Client:
 
     def check_friend_requests(self):
         # 向服务器发送请求检查好友请求的消息
-        request_message = f"check_requester_requests#$#{self.user_id}#$#_"
+        request_message = f"check_requester_requests#$#{self.user_id}"
         self.socket.send(self.encryption.encrypt(request_message.encode('utf-8')))
         print(f'Sends a check friend request to the server: {request_message}')
 

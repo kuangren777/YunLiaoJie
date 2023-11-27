@@ -350,6 +350,30 @@ class Database:
             print(f"An error occurred while adding member to group: {e}")
             self.conn.rollback()  # 回滚事务
 
+    def get_group_info_include_members(self, group_id):
+        """
+        获取群组信息。
+        :param group_id: 群组的 ID
+        """
+        group_info = {}
+        # 查询群聊的基本信息
+        self.cursor.execute("SELECT group_name, created_by, created_at FROM groups WHERE group_id = ?",
+                            (group_id,))
+        row = self.cursor.fetchone()
+        if row:
+            group_info['群聊名称'], group_info['创建人'], group_info['创建时间'] = row
+
+            # 查询群聊成员的名称
+            self.cursor.execute("""
+                SELECT u.username 
+                FROM group_members AS gm
+                JOIN users AS u ON gm.user_id = u.user_id
+                WHERE gm.group_id = ?
+            """, (group_id,))
+            members = self.cursor.fetchall()
+            group_info['群聊成员'] = [member[0] for member in members]
+
+        return group_info
 
 
 # if __name__ == "__main__":
