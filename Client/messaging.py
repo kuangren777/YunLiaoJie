@@ -36,8 +36,6 @@ class ClientSignals(QObject):
     run = pyqtSignal()
 
 
-
-
 class Client:
     def __init__(self, host, port, user_info):
         self.host: str = host
@@ -80,7 +78,6 @@ class Client:
         # self.gui.signals.accept_friend_request.connect(self.accept_friend_request)
         # self.gui.signals.reject_friend_request.connect(self.reject_friend_request)
 
-
     def connect_to_server(self):
         try:
             self.socket.connect((self.host, self.port))
@@ -101,6 +98,25 @@ class Client:
                 self.socket.sendall(encrypted_message)
             except Exception as e:
                 print(f"Failed to send message: {e}")
+
+    def create_group(self, selected_friends_names, group_name):
+        """
+        向服务器发送创建群聊的请求。
+        :param selected_friends_names: 选中的好友名称列表
+        :param group_name: 群聊的名称
+        """
+        if self.connected:
+            try:
+                print(selected_friends_names)
+                # 构造请求消息
+                friends_names_str = ",".join(map(str, selected_friends_names))  # 将 ID 列表转换为字符串
+                print(friends_names_str)
+                create_group_message = f'create_group#$#{self.user_id}#$#{group_name}#$#{friends_names_str}'
+                encrypted_message = self.encryption.encrypt(create_group_message.encode('utf-8'))
+                self.socket.sendall(encrypted_message)
+                print(f"Sent create group request to the server: {create_group_message}")
+            except Exception as e:
+                print(f"Failed to send create group request: {e}")
 
     def get_friend_name(self, friend_id: int):
         for friend in self.all_friends:
@@ -144,8 +160,9 @@ class Client:
                                                                 current_datetime)
                     else:
                         formatted_message = f"{content}"
-                        self.signals.display_current_group_message.emit(int(group_id), int(sender_id), formatted_message,
-                                                               current_datetime)
+                        self.signals.display_current_group_message.emit(int(group_id), int(sender_id),
+                                                                        formatted_message,
+                                                                        current_datetime)
 
                 # elif message_type == 'friend_request':
                 #     # 假设消息格式是：friend_request#$#<user_id>#$#<friend_id>
@@ -272,10 +289,6 @@ class Client:
         else:
             print(f"无法删除好友 {friend_id}。")
             return False
-
-    def create_group(self, selected_friends):
-        # TODO: 发送创建群聊请求到服务器的逻辑
-        pass
 
     def send_add_friend_request(self, friend_user_id):
         # 发送添加朋友请求到服务器的逻辑

@@ -333,6 +333,23 @@ class Database:
 
         return pending_requests
 
+    def add_member_to_group(self, group_id, user_id):
+        """
+        将用户添加到群组。
+        :param group_id: 群组的 ID
+        :param user_id: 用户的 ID
+        """
+        try:
+            cursor = self.conn.cursor()
+            joined_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 获取当前时间
+            cursor.execute('INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, ?)',
+                           (group_id, user_id, joined_at))
+            self.conn.commit()  # 提交事务
+            print(f"User {user_id} added to group {group_id}")
+        except sqlite3.Error as e:
+            print(f"An error occurred while adding member to group: {e}")
+            self.conn.rollback()  # 回滚事务
+
 
 
 # if __name__ == "__main__":

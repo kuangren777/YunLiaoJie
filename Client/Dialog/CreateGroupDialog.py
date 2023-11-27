@@ -16,6 +16,11 @@ class CreateGroupDialog(QtWidgets.QDialog):
         self.setWindowTitle('发起群聊')
         self.layout = QtWidgets.QVBoxLayout(self)
 
+        # 添加一个用于输入群聊名称的 QLineEdit
+        self.group_name_edit = QtWidgets.QLineEdit(self)
+        self.group_name_edit.setPlaceholderText("输入群聊名称")
+        self.layout.addWidget(self.group_name_edit)
+
         self.label = QtWidgets.QLabel("选择要添加到群聊的朋友:")
         self.layout.addWidget(self.label)
 
@@ -42,3 +47,9 @@ class CreateGroupDialog(QtWidgets.QDialog):
             if item.checkState() == QtCore.Qt.Checked:
                 selected_friends.append(item.text())
         return selected_friends
+
+    def get_group_name(self):
+        """
+        返回用户输入的群聊名称。
+        """
+        return self.group_name_edit.text().strip()

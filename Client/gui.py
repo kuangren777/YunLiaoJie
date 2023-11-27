@@ -183,8 +183,8 @@ class GUI(QtWidgets.QWidget):
         dialog = CreateGroupDialog(self.client.all_friends, self)
         if dialog.exec_() == QtWidgets.QDialog.Accepted:
             selected_friends = dialog.get_selected_friends()
-            # 这里需要实现发送创建群聊请求的逻辑
-            self.client.create_group(selected_friends)
+            group_name = dialog.get_group_name()  # 假设对话框提供获取群组名的方法
+            self.client.create_group([f for f in selected_friends], group_name)
 
     def on_friend_info_button_click(self):
         # 显示选中的好友信息
