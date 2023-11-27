@@ -382,6 +382,22 @@ class Database:
 
         return group_info
 
+    def remove_member_from_group(self, user_id, group_id):
+        """
+        从群聊中移除一个成员。
+        :param group_id: 群聊的 ID
+        :param user_id: 用户的 ID
+        :return: 操作是否成功
+        """
+        try:
+            self.cursor.execute("""DELETE FROM group_members WHERE group_id = ? AND user_id = ?""",
+                                (group_id, user_id))
+            self.conn.commit()  # 提交事务
+            return True
+        except Exception as e:
+            print(f"Error removing member from group: {e}")
+            return False
+
 
 # if __name__ == "__main__":
 #     db = Database()

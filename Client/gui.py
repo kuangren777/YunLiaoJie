@@ -3,6 +3,8 @@
 # @Author  : KuangRen777
 # @File    : gui.py
 # @Tags    :
+import time
+
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import pyqtSignal, QObject
 from datetime import datetime, timedelta
@@ -13,6 +15,8 @@ from Client.Dialog.AddFriendDialog import AddFriendDialog
 from Client.Dialog.AddGroupMemberDialog import AddGroupMemberDialog
 
 import pytz
+import threading
+import time
 
 
 class GUI(QtWidgets.QWidget):
@@ -84,9 +88,6 @@ class GUI(QtWidgets.QWidget):
         self.friends_list = QtWidgets.QListWidget()
         self.friends_list.setMinimumWidth(200)
         left_layout.addWidget(self.friends_list)  # 将好友列表添加到左侧布局
-
-        # 加载好友和群聊列表
-        self.load_friends_and_groups()
 
         # 将左侧 widget 添加到 Splitter
         splitter.addWidget(left_widget)
@@ -185,6 +186,14 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
+        # 加载好友和群聊列表
+        self.load_friends_and_groups()
+
+    def auto_reload_friends_and_groups(self):
+        while True:
+            time.sleep(1)  # 每60秒刷新一次
+            self.update_list_signal.emit()  # 通知主线程更新列表
+
     def display_group_add_member_list(self, group_info):
         group_id = self.current_item  # 当前选中的群聊 ID
         current_group_members = group_info['群聊成员']
@@ -210,8 +219,34 @@ class GUI(QtWidgets.QWidget):
         self.client.get_group_info_for_add_member(group_id)
 
     def on_delete_group_button_click(self):
-        # TODO: 退出群聊
-        pass
+        # 确保已选择群聊
+        if self.current_chat_type != 'group' or self.current_item is None:
+            QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个群聊。")
+            return
+
+        group_id = self.current_item  # 当前选中的群聊 ID
+        reply = QtWidgets.QMessageBox.question(
+            self, '确认退出', '你确定要退出这个群聊吗？',
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            # 发送退出群聊请求
+            self.client.leave_group(group_id)
+
+        self.group_info_button.setVisible(False)
+        self.delete_group_button.setVisible(False)
+        self.add_group_member_button.setVisible(False)
+
+        thread = threading.Thread(target=self.reload_friends_and_groups_in_one_second())
+        thread.start()
+
+    def always_reload_friends_and_groups(self):
+        while True:
+            self.reload_friends_and_groups_in_one_second()
+
+    def reload_friends_and_groups_in_one_second(self):
+        time.sleep(1)
+        self.load_friends_and_groups()  # 刷新好友列表
 
     def on_group_info_button_click(self):
         # 检查当前是否选择了群聊
@@ -234,10 +269,6 @@ class GUI(QtWidgets.QWidget):
             #     QtWidgets.QMessageBox.warning(self, "错误", "无法获取群聊信息。")
         else:
             QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个群聊。")
-
-    def delete_group_button(self):
-        # TODO: 退出群聊按钮
-        pass
 
     def on_send_file_button_click(self):
         # TODO: 文件发送按钮
@@ -378,6 +409,14 @@ class GUI(QtWidgets.QWidget):
             self.messages_area.clear()
         if hasattr(self, 'current_friend_label'):
             self.current_friend_label.setText("选择一个好友以开始聊天")
+
+        self.friend_info_button.setVisible(False)
+        self.delete_friend_button.setVisible(False)
+        self.send_file_button.setVisible(False)
+
+        self.group_info_button.setVisible(False)
+        self.delete_group_button.setVisible(False)
+        self.add_group_member_button.setVisible(False)
 
     def add_list_item(self, item, is_friend):
         if is_friend:

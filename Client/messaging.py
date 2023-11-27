@@ -230,6 +230,12 @@ class Client:
             self.signals.run.emit()
             sys.exit(self.app.exec_())  # 启动事件循环
 
+    def leave_group(self, group_id):
+        # 向服务器发送退出群聊的请求
+        leave_group_message = f'leave_group#$#{self.user_id}#$#{group_id}'
+        encrypted_message = self.encryption.encrypt(leave_group_message)
+        self.socket.sendall(encrypted_message)
+
     def add_member_to_group(self, group_id, member_id):
         """
         向服务器发送添加群组成员的请求。

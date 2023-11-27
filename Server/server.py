@@ -104,6 +104,7 @@ class Server:
                             client_socket.sendall(encrypted_response)
 
                     elif len(parameter) == 3:
+
                         message_type, recipient, content = message.split('#$#')
 
                         if message_type == 'group':
@@ -150,6 +151,10 @@ class Server:
                             print(f'group_id:{group_id}, member_id:{member_id}')
                             self.add_member_to_group(group_id, member_id)
 
+                        elif message_type == 'leave_group':
+                            user_id, group_id = parameter[1], parameter[2]
+                            self.handle_leave_group_request(client_socket, user_id, group_id)
+
                         else:
 
                             """
@@ -192,6 +197,23 @@ class Server:
 
         client_socket.close()
         self.remove_client(address)
+
+    def handle_leave_group_request(self, client_socket, user_id, group_id):
+        # 从数据库中移除群聊成员
+        if self.database.remove_member_from_group(user_id, group_id):
+            print(f"User {user_id} left group {group_id}")
+            # 可选：通知群组中其他成员有人离开
+            # self.notify_group_members_group_change(group_id, user_id, "left")
+        else:
+            print(f"Failed to remove user {user_id} from group {group_id}")
+
+    # def notify_group_members_group_change(self, group_id, user_id, action):
+    #     message = f"group_change_notification#$#{group_id}#$#{user_id}#$#{action}"
+    #     group_members = self.database.get_group_members(group_id)
+    #     for member_id in group_members:
+    #         if member_id != user_id and str(member_id) in self.current_online_id_to_address:
+    #             member_socket = self.clients[self.current_online_id_to_address[str(member_id)]]
+    #             member_socket.send(self.encryption.encrypt(message.encode('utf-8')))
 
     def add_member_to_group(self, group_id, member_ids):
         """
