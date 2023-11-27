@@ -356,9 +356,13 @@ class Database:
         :param group_id: 群组的 ID
         """
         group_info = {}
-        # 查询群聊的基本信息
-        self.cursor.execute("SELECT group_name, created_by, created_at FROM groups WHERE group_id = ?",
-                            (group_id,))
+        # 查询群聊的基本信息，包括创建者的用户名
+        self.cursor.execute("""
+            SELECT g.group_name, u.username, g.created_at
+            FROM groups AS g
+            JOIN users AS u ON g.created_by = u.user_id
+            WHERE g.group_id = ?
+        """, (group_id,))
         row = self.cursor.fetchone()
         if row:
             group_info['群聊名称'], group_info['创建人'], group_info['创建时间'] = row
