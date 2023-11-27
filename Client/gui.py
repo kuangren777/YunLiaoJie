@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QApplication
 
 from Client.Dialog.CreateGroupDialog import CreateGroupDialog
 from Client.Dialog.AddFriendDialog import AddFriendDialog
+from Client.Dialog.AddGroupMemberDialog import AddGroupMemberDialog
 
 import pytz
 
@@ -17,6 +18,7 @@ import pytz
 class GUI(QtWidgets.QWidget):
     display_friend_info_signal = pyqtSignal(dict)
     display_group_info_signal = pyqtSignal(dict)
+    display_group_add_member_list_signal = pyqtSignal(dict)
     friend_request_received = pyqtSignal(str, str, str)  # user_id, requester_id, requester_username
 
     def __init__(self, client):
@@ -32,6 +34,7 @@ class GUI(QtWidgets.QWidget):
         # 将信号连接到槽函数
         self.display_friend_info_signal.connect(self.show_friend_info)
         self.display_group_info_signal.connect(self.show_group_info)
+        self.display_group_add_member_list_signal.connect(self.display_group_add_member_list)
         self.friend_request_received.connect(self.handle_friend_request_received)
         self.client.signals.display_error_message.connect(self.display_error_message)
         self.client.signals.update_list_item_message_preview_when_receive.connect(
@@ -125,7 +128,7 @@ class GUI(QtWidgets.QWidget):
         self.group_actions_layout.addWidget(self.group_info_button, 1)
 
         # 群聊信息按钮
-        self.add_group_member_button = QtWidgets.QPushButton("添加成员")
+        self.add_group_member_button = QtWidgets.QPushButton("邀请好友")
         self.add_group_member_button.clicked.connect(self.on_add_group_member_button_click)  # 需要定义该方法
         self.group_actions_layout.addWidget(self.add_group_member_button, 1)
 
@@ -182,12 +185,32 @@ class GUI(QtWidgets.QWidget):
         # 设置列表项间距
         self.friends_list.setSpacing(1)  # 设置列表项的间距，您可以调整数字来改变间距大小
 
+    def display_group_add_member_list(self, group_info):
+        group_id = self.current_item  # 当前选中的群聊 ID
+        current_group_members = group_info['群聊成员']
+
+        # 弹出添加群成员的对话框
+        dialog = AddGroupMemberDialog(self.client.all_friends, current_group_members, parent=self)
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+            selected_friends = dialog.get_selected_friends()
+
+            # 调用客户端的方法邀请好友到群聊
+            for friend_name in selected_friends:
+                friend_id = self.get_friend_id(friend_name)
+                if friend_id is not None:
+                    self.client.add_member_to_group(group_id, friend_id)
+
     def on_add_group_member_button_click(self):
-        # TODO: 邀请好友
-        pass
+        # 确保已选择群聊
+        if self.current_chat_type != 'group' or self.current_item is None:
+            QtWidgets.QMessageBox.warning(self, "操作错误", "请先选择一个群聊。")
+            return
+
+        group_id = self.current_item  # 当前选中的群聊 ID
+        self.client.get_group_info_for_add_member(group_id)
 
     def on_delete_group_button_click(self):
-        # TODO: 删除群聊
+        # TODO: 退出群聊
         pass
 
     def on_group_info_button_click(self):

@@ -346,9 +346,12 @@ class Database:
                            (group_id, user_id, joined_at))
             self.conn.commit()  # 提交事务
             print(f"User {user_id} added to group {group_id}")
+            return True
+
         except sqlite3.Error as e:
             print(f"An error occurred while adding member to group: {e}")
             self.conn.rollback()  # 回滚事务
+            return False
 
     def get_group_info_include_members(self, group_id):
         """

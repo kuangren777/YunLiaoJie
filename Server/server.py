@@ -94,6 +94,15 @@ class Server:
                             encrypted_response = self.encryption.encrypt(response_message.encode('utf-8'))
                             client_socket.sendall(encrypted_response)
 
+                        elif message_type == 'get_group_info_add_member':
+                            group_id = parameter[1]
+                            print(group_id)
+                            group_info = self.get_group_info(group_id)
+                            response_message = f'get_group_info_add_member_response#$#{group_info}'
+                            print(f'get_group_info_add_member_response: {response_message}')
+                            encrypted_response = self.encryption.encrypt(response_message.encode('utf-8'))
+                            client_socket.sendall(encrypted_response)
+
                     elif len(parameter) == 3:
                         message_type, recipient, content = message.split('#$#')
 
@@ -135,6 +144,11 @@ class Server:
                             user_id, friend_id = parameter[1], parameter[2]
 
                             self.database.accept_friend_request(user_id, friend_id)
+
+                        elif message_type == 'add_member_to_group':
+                            group_id, member_id = parameter[1], parameter[2]
+                            print(f'group_id:{group_id}, member_id:{member_id}')
+                            self.add_member_to_group(group_id, member_id)
 
                         else:
 
@@ -178,6 +192,20 @@ class Server:
 
         client_socket.close()
         self.remove_client(address)
+
+    def add_member_to_group(self, group_id, member_ids):
+        """
+        添加成员到群组。
+        :param group_id: 群组的 ID
+        :param member_ids: 要添加的好友 ID
+        """
+        # 在数据库中添加成员到群组
+        for member_id in member_ids:
+            # 假设 self.database.add_member_to_group 是一个实现该功能的方法
+            if self.database.add_member_to_group(group_id, member_id):
+                print(f"Member {member_id} added to group {group_id}")
+            else:
+                print(f"Failed to add member {member_id} to group {group_id}")
 
     def get_group_info(self, group_id):
         # 从数据库中获取群聊信息

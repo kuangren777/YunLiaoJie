@@ -107,10 +107,8 @@ class Client:
         """
         if self.connected:
             try:
-                print(selected_friends_names)
                 # 构造请求消息
                 friends_names_str = ",".join(map(str, selected_friends_names))  # 将 ID 列表转换为字符串
-                print(friends_names_str)
                 create_group_message = f'create_group#$#{self.user_id}#$#{group_name}#$#{friends_names_str}'
                 encrypted_message = self.encryption.encrypt(create_group_message.encode('utf-8'))
                 self.socket.sendall(encrypted_message)
@@ -151,6 +149,11 @@ class Client:
                         group_info = parameter[1]
                         group_info = ast.literal_eval(group_info)
                         self.gui.display_group_info_signal.emit(group_info)
+
+                    elif message_type == 'get_group_info_add_member_response':
+                        group_info = parameter[1]
+                        group_info = ast.literal_eval(group_info)
+                        self.gui.display_group_add_member_list_signal.emit(group_info)
 
                 elif len(parameter) == 3:
 
@@ -226,6 +229,28 @@ class Client:
             threading.Thread(target=self.receive_messages, daemon=True).start()
             self.signals.run.emit()
             sys.exit(self.app.exec_())  # 启动事件循环
+
+    def add_member_to_group(self, group_id, member_id):
+        """
+        向服务器发送添加群组成员的请求。
+        :param group_id: 群组的 ID
+        :param member_id: 要添加的成员 ID
+        """
+        if self.connected:
+            try:
+                # 构造请求消息
+                request_message = f'add_member_to_group#$#{group_id}#$#{member_id}'
+                encrypted_request = self.encryption.encrypt(request_message.encode('utf-8'))
+                self.socket.sendall(encrypted_request)
+                print(f"Sent add member to group request to the server: {request_message}")
+            except Exception as e:
+                print(f"Failed to send add member to group request: {e}")
+
+    def get_group_info_for_add_member(self, group_id):
+        # 向服务器发送获取群聊信息的请求
+        request_message = f'get_group_info_add_member#$#{group_id}'
+        encrypted_request = self.encryption.encrypt(request_message.encode('utf-8'))
+        self.socket.sendall(encrypted_request)
 
     def get_group_info(self, group_id):
         # 向服务器发送获取群聊信息的请求
